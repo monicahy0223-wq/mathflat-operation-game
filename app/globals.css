@@ -1,0 +1,435 @@
+@import "tailwindcss";
+
+/* ── 타이포그래피 토큰 ──────────────────────────────────────────────────────── */
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* 폰트 */
+  --font-game: Pretendard, "Noto Sans KR", sans-serif;
+
+  /* 기본 자간 */
+  --ls-base:  -0.02em;
+  --ls-title: -0.03em;
+  --ls-label:  0.08em;
+
+  /* 크기 */
+  --fs-stat-label: 12px;
+  --fs-badge:      13px;
+  --fs-body:       15px;
+  --fs-btn:        16px;
+  --fs-bubble:     18px;
+  --fs-title:      22px;
+  --fs-stat-value: 28px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+/* ── 전역 폰트 ──────────────────────────────────────────────────────────────── */
+html, body {
+  font-family: var(--font-game);
+  letter-spacing: var(--ls-base);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* ── 타이포그래피 유틸리티 클래스 ─────────────────────────────────────────── */
+
+/* 스탯 라벨 (SCORE · TIME · COMBO · COINS · SKILL) */
+.ty-stat-label {
+  font-size: var(--fs-stat-label);
+  font-weight: 900;
+  letter-spacing: var(--ls-label);
+  color: #9aa3b2;
+  line-height: 1;
+}
+
+/* 스탯 숫자 값 */
+.ty-stat-value {
+  font-size: var(--fs-stat-value);
+  font-weight: 900;
+  letter-spacing: var(--ls-base);
+  line-height: 1;
+}
+
+/* 배지 / 태그 */
+.ty-badge {
+  font-size: var(--fs-badge);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* 말풍선 */
+.ty-bubble {
+  font-size: var(--fs-bubble);
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: var(--ls-base);
+}
+
+/* 섹션 제목 */
+.ty-title {
+  font-size: var(--fs-title);
+  font-weight: 900;
+  letter-spacing: var(--ls-title);
+  line-height: 1.2;
+}
+
+/* 버튼 텍스트 공통 */
+.ty-btn {
+  font-family: var(--font-game);
+  font-size: var(--fs-btn);
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+/* 일반 UI 본문 */
+.ty-body {
+  font-size: var(--fs-body);
+  font-weight: 600;
+  letter-spacing: var(--ls-base);
+}
+
+/* ── 최소 폰트 가드: 10~13px Tailwind 클래스 일괄 상향 ─────────────────── */
+/* 개발자 패널 등 의도적인 소형 텍스트는 [data-dev] 속성으로 예외 처리 */
+.text-\[9px\]  { font-size: 13px !important; }
+.text-\[10px\] { font-size: 12px !important; }
+.text-\[11px\] { font-size: 13px !important; }
+
+/* ── 게임 인터랙션 ─────────────────────────────────────────────────────────── */
+
+/* 카드 hover — 살짝 들어올림 */
+.game-card {
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow  0.18s ease;
+}
+.game-card:hover {
+  transform:  translateY(-4px);
+  box-shadow: 0 12px 32px rgba(79,70,229,0.18), 0 3px 8px rgba(0,0,0,0.1);
+}
+
+/* 버튼 hover / active */
+.game-btn {
+  transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1),
+              filter     0.12s ease,
+              box-shadow 0.14s ease;
+}
+.game-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  filter:    brightness(1.08);
+}
+.game-btn:active:not(:disabled) {
+  transform: scale(0.97);
+  filter:    brightness(0.98);
+}
+
+/* 스탯 숫자 팝 */
+@keyframes statValuePop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.18); }
+  70%  { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+.animate-stat-pop { animation: statValuePop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* 퍼즐 슬롯 빈칸 hover */
+.puzzle-slot-empty {
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+.puzzle-slot-empty:hover {
+  background: rgba(139,92,246,0.18) !important;
+  border-color: rgba(139,92,246,0.5) !important;
+  transform: scale(1.06);
+}
+
+/* 퍼즐 슬롯 채워질 때 */
+@keyframes puzzleReveal {
+  0%   { transform: scale(0.5) rotate(-12deg); opacity: 0; }
+  55%  { transform: scale(1.2)  rotate(4deg);  opacity: 1; }
+  80%  { transform: scale(0.95) rotate(-1deg); }
+  100% { transform: scale(1)    rotate(0deg);  opacity: 1; }
+}
+.animate-puzzle-reveal { animation: puzzleReveal 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* 말풍선 */
+.bubble-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.bubble-card:hover {
+  transform: scale(1.03);
+}
+
+/* 캐릭터 idle 유영 */
+@keyframes idleFloat {
+  0%, 100% { transform: translateY(0px)   rotate(0deg);   }
+  25%       { transform: translateY(-7px)  rotate(1.2deg); }
+  60%       { transform: translateY(-4px)  rotate(-0.6deg);}
+}
+.animate-idle-float { animation: idleFloat 2.8s ease-in-out infinite; }
+
+/* 경로 라인 살아있는 느낌 (현재/클리어 구간) */
+@keyframes pathFlow {
+  0%   { background-position: 0 0;   }
+  100% { background-position: 0 48px;}
+}
+.path-active {
+  background: repeating-linear-gradient(
+    180deg,
+    #3b82f6 0px, #3b82f6 8px,
+    rgba(59,130,246,0.35) 8px, rgba(59,130,246,0.35) 16px
+  );
+  background-size: 100% 16px;
+  animation: pathFlow 0.9s linear infinite;
+}
+.path-cleared {
+  background: repeating-linear-gradient(
+    180deg,
+    #10b981 0px, #10b981 8px,
+    rgba(16,185,129,0.35) 8px, rgba(16,185,129,0.35) 16px
+  );
+  background-size: 100% 16px;
+  animation: pathFlow 1.2s linear infinite;
+}
+
+/* 스테이지 잠금 해제 스파크 */
+@keyframes unlockSpark {
+  0%   { transform: scale(0) rotate(-15deg); opacity:1; }
+  55%  { transform: scale(1.3) rotate(5deg); opacity:1; }
+  100% { transform: scale(1)   rotate(0deg); opacity:0; }
+}
+.animate-unlock-spark { animation: unlockSpark 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+
+/* 지역 카드 배경 기울기 장식 */
+@keyframes terrainSway {
+  0%, 100% { transform: rotate(-1deg) scale(1.02);  }
+  50%       { transform: rotate(0.5deg) scale(1.04); }
+}
+.animate-terrain { animation: terrainSway 6s ease-in-out infinite; }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  15%       { transform: translateX(-10px) rotate(-1deg); }
+  30%       { transform: translateX(10px)  rotate(1deg); }
+  45%       { transform: translateX(-7px)  rotate(-0.5deg); }
+  60%       { transform: translateX(7px)   rotate(0.5deg); }
+  75%       { transform: translateX(-4px); }
+  90%       { transform: translateX(4px); }
+}
+
+@keyframes cardBounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30%      { transform: translateY(-16px) scale(1.04); }
+  55%      { transform: translateY(-8px)  scale(1.02); }
+  75%      { transform: translateY(-4px)  scale(1.01); }
+  90%      { transform: translateY(-1px)  scale(1); }
+}
+
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0.5); }
+  70%  { transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes fadeOut {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Character lunges toward the monster then snaps back */
+@keyframes charAttack {
+  0%        { transform: translateX(-50%) scale(1) rotate(0deg); }
+  18%       { transform: translateX(calc(-50% + 90px)) scale(1.35) rotate(10deg); }
+  38%       { transform: translateX(calc(-50% + 44px)) scale(1.15) rotate(4deg); }
+  60%       { transform: translateX(calc(-50% + 14px)) scale(1.05); }
+  80%       { transform: translateX(calc(-50% + 4px)); }
+  100%      { transform: translateX(-50%) scale(1) rotate(0deg); }
+}
+
+/* Monster slammed on hit — big recoil + scale crush + red flash */
+@keyframes monsterHit {
+  0%        { transform: translateX(0)    scale(1);    filter: none; }
+  12%       { transform: translateX(20px) scale(0.70) rotate(8deg);  filter: brightness(5) saturate(0) hue-rotate(300deg); }
+  28%       { transform: translateX(-14px) scale(0.85) rotate(-5deg); filter: brightness(3) hue-rotate(290deg); }
+  46%       { transform: translateX(9px)  scale(0.92); filter: brightness(2); }
+  65%       { transform: translateX(-5px) scale(0.97); filter: brightness(1.4); }
+  82%       { transform: translateX(2px)  scale(1); }
+  100%      { transform: translateX(0)    scale(1);    filter: none; }
+}
+
+/* Monster charges left (counter-attack) */
+@keyframes monsterCounter {
+  0%, 100% { transform: translateX(0) scale(1) rotate(0deg); }
+  25%      { transform: translateX(-60px) scale(1.35) rotate(-14deg); }
+  55%      { transform: translateX(-22px) scale(1.15) rotate(-5deg); }
+  80%      { transform: translateX(-6px); }
+}
+
+/* "-1" damage number floats up and fades */
+@keyframes damageFloat {
+  0%   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1.3); }
+  60%  { opacity: 1; transform: translateX(-50%) translateY(-38px) scale(1.1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-56px) scale(0.8); }
+}
+
+/* ⭐ star burst for combo */
+@keyframes starBurst {
+  0%   { opacity: 1; transform: scale(0.5) translateY(0); }
+  60%  { opacity: 1; transform: scale(1.3) translateY(-16px); }
+  100% { opacity: 0; transform: scale(1)   translateY(-28px); }
+}
+
+/* heart pop when HP is restored / first shown */
+@keyframes heartPop {
+  0%, 100% { transform: scale(1); }
+  40%      { transform: scale(1.5); }
+}
+
+.animate-shake           { animation: shake          0.55s ease-in-out; }
+.animate-card-bounce     { animation: cardBounce     0.55s ease-in-out; }
+.animate-pop-in          { animation: popIn          0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+.animate-char-attack     { animation: charAttack     0.52s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.animate-monster-hit     { animation: monsterHit     0.50s ease-in-out; }
+.animate-monster-counter { animation: monsterCounter 0.60s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.animate-damage-float    { animation: damageFloat    0.80s ease-out forwards; }
+.animate-star-burst      { animation: starBurst      0.70s ease-out forwards; }
+
+/* Large centered feedback popup */
+@keyframes feedbackBurst {
+  0%   { opacity: 0;   transform: translate(-50%, -50%) scale(0.2) rotate(-4deg); }
+  18%  { opacity: 1;   transform: translate(-50%, -50%) scale(1.25) rotate(2deg); }
+  30%  { opacity: 1;   transform: translate(-50%, -50%) scale(0.92) rotate(-1deg); }
+  42%  { opacity: 1;   transform: translate(-50%, -50%) scale(1.06) rotate(0deg); }
+  55%  { opacity: 1;   transform: translate(-50%, -50%) scale(1); }
+  75%  { opacity: 1;   transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0;   transform: translate(-50%, -50%) scale(0.85) translateY(-12px); }
+}
+.animate-feedback-burst {
+  animation: feedbackBurst 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ── World-map decorative animations ── */
+@keyframes cloudDrift {
+  0%   { transform: translateX(0px); }
+  50%  { transform: translateX(18px); }
+  100% { transform: translateX(0px); }
+}
+@keyframes cloudDriftSlow {
+  0%   { transform: translateX(0px); }
+  50%  { transform: translateX(-22px); }
+  100% { transform: translateX(0px); }
+}
+@keyframes starTwinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.85); }
+  50%       { opacity: 1;    transform: scale(1.2);  }
+}
+@keyframes grassSway {
+  0%, 100% { transform: rotate(-2deg) scaleY(1); }
+  50%       { transform: rotate(3deg) scaleY(1.05); }
+}
+@keyframes nodeGlow {
+  0%, 100% { box-shadow: 0 0 0 6px rgba(234,179,8,0.18), 0 6px 20px rgba(0,0,0,0.5); }
+  50%       { box-shadow: 0 0 0 12px rgba(234,179,8,0.28), 0 6px 24px rgba(0,0,0,0.5); }
+}
+.animate-cloud-drift      { animation: cloudDrift      9s ease-in-out infinite; }
+.animate-cloud-drift-slow { animation: cloudDriftSlow 15s ease-in-out infinite; }
+.animate-star-twinkle     { animation: starTwinkle     2.5s ease-in-out infinite; }
+.animate-grass-sway       { animation: grassSway       3s ease-in-out infinite; }
+.animate-node-glow        { animation: nodeGlow        2s ease-in-out infinite; }
+
+/* ── Map character animations ── */
+@keyframes mapCharFloat {
+  0%, 100% { transform: translateX(-50%) translateY(0px)   scale(1);    }
+  50%       { transform: translateX(-50%) translateY(-10px) scale(1.04); }
+}
+@keyframes charShadowPulse {
+  0%, 100% { transform: translateX(-50%) scaleX(1)    scaleY(1);    opacity: 0.45; }
+  50%       { transform: translateX(-50%) scaleX(0.7)  scaleY(0.65); opacity: 0.18; }
+}
+@keyframes nodeBeamPulse {
+  0%, 100% { opacity: 0.55; transform: scaleX(1) scaleY(1); }
+  50%       { opacity: 0.9;  transform: scaleX(1.08) scaleY(1.15); }
+}
+@keyframes connGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(245,158,11,0.4); }
+  50%       { box-shadow: 0 0 18px rgba(245,158,11,0.75); }
+}
+.animate-map-char-float    { animation: mapCharFloat    2.4s ease-in-out infinite; }
+.animate-char-shadow-pulse { animation: charShadowPulse 2.4s ease-in-out infinite; }
+.animate-node-beam-pulse   { animation: nodeBeamPulse   1.8s ease-in-out infinite; }
+.animate-conn-glow         { animation: connGlow        2s ease-in-out infinite; }
+
+/* ── Effect system ── */
+
+/* Stage node click ripple */
+@keyframes rippleExpand {
+  0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 0.8; }
+  70%  { opacity: 0.4; }
+  100% { transform: translate(-50%, -50%) scale(3.2); opacity: 0; }
+}
+.animate-ripple { animation: rippleExpand 0.65s ease-out forwards; }
+
+/* Screen flash — correct (white) */
+@keyframes flashCorrect {
+  0%   { opacity: 0; }
+  15%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+/* Screen flash — wrong (red) */
+@keyframes flashWrong {
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+.animate-flash-correct { animation: flashCorrect 0.38s ease-out forwards; }
+.animate-flash-wrong   { animation: flashWrong   0.42s ease-out forwards; }
+
+/* Floating score numbers */
+@keyframes floatScore {
+  0%   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1.3); }
+  55%  { opacity: 1; transform: translateX(-50%) translateY(-52px) scale(1);   }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-72px) scale(0.8); }
+}
+.animate-float-score { animation: floatScore 0.95s ease-out forwards; }
+
+/* Battle entry banner */
+@keyframes battleEntryAnim {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(1.8); }
+  18%  { opacity: 1; transform: translate(-50%, -50%) scale(0.96); }
+  70%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.88); }
+}
+.animate-battle-entry { animation: battleEntryAnim 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+/* Arrival sparkle particles (6 directions) */
+@keyframes burstUp  { from{opacity:1;transform:translate(-50%,-50%) scale(1.2);} to{opacity:0;transform:translate(-50%,-80px) scale(0.2);} }
+@keyframes burstUL  { from{opacity:1;transform:translate(-50%,-50%) scale(1.2);} to{opacity:0;transform:translate(-90px,-65px) scale(0.2);} }
+@keyframes burstUR  { from{opacity:1;transform:translate(-50%,-50%) scale(1.2);} to{opacity:0;transform:translate(30px,-65px) scale(0.2);} }
+@keyframes burstL   { from{opacity:1;transform:translate(-50%,-50%) scale(1.2);} to{opacity:0;transform:translate(-90px,-10px) scale(0.2);} }
+@keyframes burstR   { from{opacity:1;transform:translate(-50%,-50%) scale(1.2);} to{opacity:0;transform:translate(40px,-10px) scale(0.2);} }
+@keyframes burstDU  { from{opacity:1;transform:translate(-50%,-50%) scale(1.2);} to{opacity:0;transform:translate(-50%,-95px) scale(0.1);} }
+.animate-burst-0 { animation: burstUp  0.75s ease-out forwards; }
+.animate-burst-1 { animation: burstUL  0.75s ease-out forwards; }
+.animate-burst-2 { animation: burstUR  0.75s ease-out forwards; }
+.animate-burst-3 { animation: burstL   0.75s ease-out forwards; }
+.animate-burst-4 { animation: burstR   0.75s ease-out forwards; }
+.animate-burst-5 { animation: burstDU  0.75s ease-out forwards; }
+
+/* Character trail ghost */
+@keyframes trailFade {
+  0%   { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+.animate-trail { animation: trailFade 0.45s ease-out forwards; }
+
+/* Dust puff on movement */
+@keyframes dustPuff {
+  0%   { opacity: 0.75; transform: translateX(-50%) translateY(0)  scale(1); }
+  100% { opacity: 0;    transform: translateX(-50%) translateY(-18px) scale(0.3); }
+}
+.animate-dust-puff { animation: dustPuff 0.5s ease-out forwards; }
