@@ -53,6 +53,101 @@ const GAME_MODE_META: Record<GameMode, { emoji: string; label: string; desc: str
   puzzle: { emoji: "🧩",  label: "퍼즐",  desc: "조각을 맞춰 완성하자!",  grad: "from-violet-400 to-purple-500" },
 };
 
+/**
+ * 지역 진입 시 모드별로 추가되는 제한 시간(초).
+ * - grow : 시간 압박을 낮춰 훈련에 집중하게 한다.
+ * - battle: 기본 (추가 없음)
+ * - puzzle: 복습이므로 충분한 시간을 준다.
+ */
+const MODE_EXTRA_TIME: Record<GameMode, number> = { grow: 20, battle: 0, puzzle: 30 };
+
+/**
+ * 월드맵에서 현재 진입 중인 지역의 상태 텍스트.
+ * 모드에 따라 "도전 중" 이 아닌 지역에 맞는 문구를 사용한다.
+ */
+const ZONE_STATUS_TEXT: Record<GameMode, string> = {
+  grow:   "🌱 훈련 중",
+  battle: "⚔️ 도전 중",
+  puzzle: "🧩 복습 중",
+};
+
+// ─── World Selection / Region Map 데이터 ─────────────────────────────────────
+
+/** 지역 선택 화면에서 보여줄 월드 카드 설정 */
+type WorldCardConfig = {
+  title:    string;
+  subtitle: string;
+  emoji:    string;
+  bgCard:   string;   // 카드 배경 (다크)
+  bgMap:    string;   // 지역 맵 배경 (밝음)
+  border:   string;
+  glow:     string;
+  desc:     string;
+  badge:    string;
+};
+const WORLD_CARDS: Record<GameMode, WorldCardConfig> = {
+  grow: {
+    title:    "숲의 성장 지역",
+    subtitle: "성장형 세계",
+    emoji:    "🌲",
+    bgCard:   "linear-gradient(160deg,#052e16 0%,#064e3b 55%,#065f46 100%)",
+    bgMap:    "linear-gradient(180deg,#bae6fd 0%,#bbf7d0 55%,#86efac 100%)",
+    border:   "rgba(16,185,129,0.55)",
+    glow:     "rgba(16,185,129,0.35)",
+    desc:     "경험치를 쌓고 레벨을 올리는 훈련의 세계",
+    badge:    "🌱 성장형",
+  },
+  battle: {
+    title:    "불꽃의 협곡",
+    subtitle: "전투형 세계",
+    emoji:    "🌋",
+    bgCard:   "linear-gradient(160deg,#1c0700 0%,#7c1d0a 55%,#b45309 100%)",
+    bgMap:    "linear-gradient(180deg,#fed7aa 0%,#fde68a 50%,#fca5a5 100%)",
+    border:   "rgba(220,38,38,0.55)",
+    glow:     "rgba(220,38,38,0.35)",
+    desc:     "몬스터와 싸워 승리하는 전투의 세계",
+    badge:    "⚔️ 전투형",
+  },
+  puzzle: {
+    title:    "지혜의 탑",
+    subtitle: "퍼즐형 세계",
+    emoji:    "🗼",
+    bgCard:   "linear-gradient(160deg,#1e1b4b 0%,#312e81 55%,#2e1065 100%)",
+    bgMap:    "linear-gradient(180deg,#c7d2fe 0%,#bfdbfe 50%,#ddd6fe 100%)",
+    border:   "rgba(99,102,241,0.55)",
+    glow:     "rgba(99,102,241,0.35)",
+    desc:     "조각을 맞춰 기억을 복구하는 지혜의 세계",
+    badge:    "🧩 퍼즐형",
+  },
+};
+
+/** 각 지역 맵 안에서 표시할 노드 설정 */
+type RegionNodeConfig = {
+  id:          string;
+  label:       string;
+  subLabel:    string;
+  emoji:       string;
+  difficulty:  "easy" | "normal" | "hard";
+  description: string;
+};
+const REGION_NODES: Record<GameMode, RegionNodeConfig[]> = {
+  grow: [
+    { id: "grow-easy",   label: "새싹 훈련",    subLabel: "TRAINING", emoji: "🌱", difficulty: "easy",   description: "천천히 시작해요!" },
+    { id: "grow-normal", label: "성장의 나무",   subLabel: "GROWTH",   emoji: "🌳", difficulty: "normal", description: "꾸준히 성장해요!" },
+    { id: "grow-hard",   label: "집중 수련",     subLabel: "LEVELUP",  emoji: "✨", difficulty: "hard",   description: "최고 수준 도전!" },
+  ],
+  battle: [
+    { id: "battle-easy",   label: "슬라임",     subLabel: "ENEMY",  emoji: "👾", difficulty: "easy",   description: "약한 적부터 시작!" },
+    { id: "battle-normal", label: "화산 전투",   subLabel: "COMBO",  emoji: "🔥", difficulty: "normal", description: "진짜 전투 시작!" },
+    { id: "battle-hard",   label: "드래곤 보스", subLabel: "BOSS",   emoji: "🐉", difficulty: "hard",   description: "최강 보스 도전!" },
+  ],
+  puzzle: [
+    { id: "puzzle-easy",   label: "기억 조각",  subLabel: "RESTORE", emoji: "🧩", difficulty: "easy",   description: "쉬운 조각 맞추기" },
+    { id: "puzzle-normal", label: "오답 복원",   subLabel: "MEMORY",  emoji: "📖", difficulty: "normal", description: "기억을 되살려요!" },
+    { id: "puzzle-hard",   label: "탑 복구",    subLabel: "PIECE",   emoji: "🏛", difficulty: "hard",   description: "완벽한 복구 도전!" },
+  ],
+};
+
 // ─── review dungeon: weakness names ──────────────────────────────────────────
 /** Maps a question's conceptName to a human-readable "weakness" label shown in review mode. */
 const CONCEPT_WEAKNESS: Record<string, string> = {
@@ -245,7 +340,12 @@ const CHAPTERS = [
     types: [
       {
         id:           15553,
+        // 지역 테마 이름 (맵 표시용)
+        zoneName:     "숲의 성장 지역",
+        // 수학 개념 제목 (게임 내 문제 헤더)
         title:        "받아올림이 없는 (세 자리 수)+(세 자리 수)",
+        // 이 지역에 진입하면 자동으로 설정될 게임 모드
+        mode:         "grow" as GameMode,
         emoji:        "🌱",
         monster:      "🐛",
         monsterName:  "슬라임",
@@ -259,7 +359,9 @@ const CHAPTERS = [
       },
       {
         id:           15554,
+        zoneName:     "불꽃의 협곡",
         title:        "실생활 문제 해결하기",
+        mode:         "battle" as GameMode,
         emoji:        "🔥",
         monster:      "🐉",
         monsterName:  "드래곤",
@@ -278,7 +380,9 @@ const CHAPTERS = [
         //   1. 이 id 값을 교체하고
         //   2. CMS_BLOCKED_IDS에서 해당 id를 제거하세요.
         id:           15552,
+        zoneName:     "지혜의 탑",
         title:        "여러 가지 방법으로 덧셈하기",
+        mode:         "puzzle" as GameMode,
         emoji:        "⚡",
         monster:      "🦕",
         monsterName:  "공룡",
@@ -298,7 +402,9 @@ const CHAPTERS = [
   emoji: string;
   types: {
     id: number;
+    zoneName: string;
     title: string;
+    mode: GameMode;
     emoji: string;
     monster: string;
     monsterName: string;
@@ -1030,7 +1136,7 @@ type WrongQuestion = Pick<GameQuestion, "id" | "text" | "answer" | "conceptName"
   source: "cms" | "mock";
 };
 
-type Phase    = "modeSelect" | "ready" | "shop" | "travel" | "playing" | "stageClear" | "result" | "review" | "reviewClear" | "difficultySelect";
+type Phase    = "modeSelect" | "ready" | "regionMap" | "shop" | "travel" | "playing" | "stageClear" | "result" | "review" | "reviewClear" | "difficultySelect";
 type CardAnim = "bounce" | "shake" | "";
 
 // ─── component ────────────────────────────────────────────────────────────────
@@ -1649,8 +1755,23 @@ export default function MathGame() {
 
   // ── stage control ─────────────────────────────────────────────────────────────
 
-  /** Show difficulty picker before entering a type */
+  /** Show difficulty picker before entering a type.
+   *  Automatically sets gameMode from the region's fixed mode so the player
+   *  never has to pick a mode manually. */
   const showDifficultySelect = useCallback((typeId: number) => {
+    // Each region has a fixed mode — apply it before showing the difficulty screen.
+    const info = getTypeInfo(typeId);
+    setGameMode(info.mode);
+    try { localStorage.setItem("mathGameMode", info.mode); } catch { /* ignore */ }
+
+    // 지역 클릭 확인 로그
+    console.log("[지역 선택]", {
+      "selectedRegion.id":    info.id,
+      "selectedRegion.title": info.title,
+      "selectedRegion.type":  info.mode,
+      "currentMode":          info.mode,
+    });
+
     setPendingTypeId(typeId);
     setCmsQuestions([]);
     setCmsPool([]);
@@ -1685,6 +1806,45 @@ export default function MathGame() {
     });
   }, []);
 
+  /**
+   * 월드 선택 화면에서 특정 지역을 선택할 때 호출.
+   * - gameMode 를 해당 지역 mode 로 설정
+   * - CMS 문제를 백그라운드 로드
+   * - regionMap 페이즈로 전환 (지역 전용 맵 표시)
+   */
+  const enterWorld = useCallback((mode: GameMode) => {
+    const typeInfo = FLAT_TYPES.find((t) => t.mode === mode) ?? FLAT_TYPES[0];
+    setGameMode(mode);
+    try { localStorage.setItem("mathGameMode", mode); } catch { /* ignore */ }
+    setPendingTypeId(typeInfo.id);
+    setCmsQuestions([]);
+    setCmsPool([]);
+    setCmsResult(null);
+    setCmsLoading(true);
+    console.log("[월드 진입]", { mode, typeId: typeInfo.id, zoneName: typeInfo.zoneName });
+    const validConcepts = CMS_CONCEPTS.filter((c) => !CMS_BLOCKED_IDS_STATIC.has(c.id));
+    fetchMultipleConcepts(validConcepts).then(({ questions, failures }) => {
+      setCmsPool(questions);
+      setCmsResult({
+        questions,
+        totalRaw:    questions.length,
+        filterStats: {
+          active: questions.length, visible: questions.length, scorable: questions.length,
+          shortAnswer: questions.length, autoScoring1: questions.length,
+          nChoice0: questions.length, numericAnswer: questions.length,
+        },
+        errorCode:   failures.length > 0 ? "PARTIAL_FAILURE" : null,
+        errorDetail: failures.length > 0 ? `conceptId 로드 실패: ${failures.join(", ")}` : null,
+        debug:       questions.length === 0 ? "CMS에서 문제를 가져오지 못했습니다. mock 사용." : null,
+      });
+      setCmsLoading(false);
+    }).catch(() => {
+      setCmsPool([]);
+      setCmsLoading(false);
+    });
+    setPhase("regionMap");
+  }, []);
+
   /** Clears the CMS pool and session questions, reverting to mock fallback. */
   const clearCmsQuestions = useCallback(() => {
     setCmsPool([]);
@@ -1713,10 +1873,14 @@ export default function MathGame() {
           : getQuestionsForStage(typeId);
 
     const usingMock = !hasCmsPool;
-    if (usingMock && process.env.NODE_ENV !== "production") {
+    if (usingMock) {
+      // Reason: errorCode from the most recent CMS fetch attempt, if any
+      const reason = cmsResult?.errorCode
+        ? `CMS 오류: ${cmsResult.errorCode}${cmsResult.errorDetail ? ` (${cmsResult.errorDetail})` : ""}`
+        : "CMS 미로드 또는 응답 없음";
       console.warn(
-        `[MOCK] conceptId=${typeId} | CMS 문제 없음 → mock fallback 사용` +
-        ` (cmsPool=0, 게임모드=${gameMode})`,
+        `[MOCK] conceptId=${typeId} | fallback=true | 사유: ${reason}` +
+        ` | 게임모드=${gameMode}`,
       );
     }
 
@@ -1733,8 +1897,8 @@ export default function MathGame() {
     setCurrentQuestion(pickQuestion(activePool, "LOW"));
     setCmsQuestions(activePool);
     setCombo(0);
-    // Time = base TOTAL_TIME + DIFFICULTY_CONFIG bonus + CMS difficulty time adjustment
-    setTimeLeft(TOTAL_TIME + cfg.timeBonus + (cmsPool.length > 0 ? diffRule.timeBonus : 0));
+    // Time = base TOTAL_TIME + DIFFICULTY_CONFIG bonus + CMS difficulty bonus + zone-mode bonus
+    setTimeLeft(TOTAL_TIME + cfg.timeBonus + (cmsPool.length > 0 ? diffRule.timeBonus : 0) + MODE_EXTRA_TIME[gameMode]);
     setFeedback(null);
     setFeedbackKey(0);
     setCardAnim("");
@@ -1745,7 +1909,12 @@ export default function MathGame() {
     setSkillCharge(0);
     setSkillReady(false);
     setShieldActive(false);
-    setPlayerLives(difficulty === "hard" ? 2 : 3);
+    // grow: 무제한 생명 (HP 개념 없음), puzzle: 관대하게 5칸, battle: 일반
+    setPlayerLives(
+      gameMode === "grow"   ? 99 :
+      gameMode === "puzzle" ? 5  :
+      difficulty === "hard" ? 2  : 3,
+    );
     // grow mode EXP reset
     setGrowExp(0);
     setGrowLevel(1);
@@ -1755,7 +1924,7 @@ export default function MathGame() {
     setGrowExpMult(1.0);
     // Show travel screen first; useEffect below advances to "playing"
     setPhase("travel");
-  }, [clearTimers, cmsPool, gameMode, wrongQuestionIds]);
+  }, [clearTimers, cmsPool, cmsResult, gameMode, wrongQuestionIds]);
 
   /** Fire the special skill (3-HP fixed damage) */
   const useSkill = useCallback(() => {
@@ -1891,13 +2060,13 @@ export default function MathGame() {
     shieldActive, play, clearTimers, addTimer,
   ]);
 
-  /** Return to world map without resetting score/progress */
+  /** Return to current region's map without resetting score/progress */
   const goToMap = useCallback(() => {
     clearTimers();
     setFeedback(null);
     setCardAnim("");
     setShopMsg(null);
-    setPhase("ready");
+    setPhase("regionMap");
   }, [clearTimers]);
 
   /** Open the shop */
@@ -2092,17 +2261,21 @@ export default function MathGame() {
       },
     ];
 
+    // LearningMode(홈 카드) → GameMode 매핑
+    const LEARNING_TO_GAME: Record<LearningMode, GameMode> = {
+      growth:    "grow",
+      challenge: "battle",
+      review:    "puzzle",
+    };
+
     const handleModeSelect = (mode: LearningMode) => {
       setLearningMode(mode);
-      if (mode === "review") {
-        if (wrongQuestions.length > 0) {
-          startReview();
-        } else {
-          // No wrong questions yet — go to worldmap with review mode context
-          setPhase("ready");
-        }
+      if (mode === "review" && wrongQuestions.length > 0) {
+        // 오답이 있으면 복습 모드 바로 진입
+        startReview();
       } else {
-        setPhase("ready");
+        // 홈 카드 클릭 → 해당 지역 전용 맵으로 바로 진입 (ready 우회)
+        enterWorld(LEARNING_TO_GAME[mode]);
       }
     };
 
@@ -2441,60 +2614,327 @@ export default function MathGame() {
     );
   }
 
-  // ─── ready / world-map screen ──────────────────────────────────────────────────
+  // ─── ready / world selection screen ──────────────────────────────────────────
   if (phase === "ready") {
-    const questProgress: Record<QuestId, number> = {
-      solve50:     lifetimeStats.totalCorrect,
-      bestCombo20: lifetimeStats.bestCombo,
-      review10:    lifetimeStats.reviewsDone,
-    };
+    const modes: GameMode[] = ["grow", "battle", "puzzle"];
     return (
-      <WorldMap
-        unlockedTypeId={unlockedTypeId}
-        clearedTypeIds={clearedTypeIds}
-        score={score}
-        bestScore={bestScore}
-        coins={coins}
-        selectedCharacter={selectedCharacter}
-        wrongCount={wrongQuestions.length}
-        questProgress={questProgress}
-        claimedQuests={claimedQuests}
-        attendanceClaimed={attendanceClaimed}
-        showTutorial={showTutorial}
-        soundEnabled={soundEnabled}
-        lifetimeStats={lifetimeStats}
-        stagesClearedCount={clearedTypeIds.length}
-        showStatsPanel={showStatsPanel}
-        dailyCompleted={dailyCompleted}
-        completionStreak={lifetimeStats.streakDays}
-        missionProgress={{ solve: solvedToday, combo: comboToday, stage: stagesClearedToday }}
-        missionsBonusClaimed={missionsBonusClaimed}
-        teacherMode={teacherMode}
-        teacherConfig={teacherConfig}
-        studentList={studentList}
-        selectedStudentId={selectedStudentId}
-        onSelectStudent={switchStudent}
-        onOpenTeacher={() => setTeacherMode(true)}
-        onCloseTeacher={() => setTeacherMode(false)}
-        onSaveTeacherConfig={(cfg) => {
-          setTeacherConfig(cfg);
-          saveTeacherConfig(cfg);
-          setMissionsBonusClaimed(false); // reset so bonus can re-fire with new targets
-        }}
-        onOpenStats={() => setShowStatsPanel(true)}
-        onCloseStats={() => setShowStatsPanel(false)}
-        onSelectStage={showDifficultySelect}
-        onOpenShop={goToShop}
-        onOpenReview={startReview}
-        onClaimQuest={claimQuest}
-        onClaimAttendance={claimAttendance}
-        onOpenTutorial={() => setShowTutorial(true)}
-        onCloseTutorial={() => { saveTutorialSeen(); setShowTutorial(false); }}
-        onToggleSound={toggleSound}
-        onGoHome={() => setPhase("modeSelect")}
-        gameMode={gameMode}
-        onSetGameMode={setAndSaveGameMode}
-      />
+      <main
+        className="min-h-screen flex flex-col overflow-hidden"
+        style={{ background: "linear-gradient(180deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%)" }}
+      >
+        {/* 배경 별 효과 */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {["✨","⭐","💫","✨","⭐","💫","✨","⭐"].map((s, i) => (
+            <div key={i} className="animate-star-twinkle absolute" style={{
+              top: `${5 + i * 12}%`, left: `${4 + i * 13}%`,
+              fontSize: i % 2 === 0 ? "1.1rem" : "0.8rem", opacity: 0.3,
+              animationDelay: `${i * 0.6}s`,
+            }}>{s}</div>
+          ))}
+        </div>
+
+        <div className="relative z-10 flex flex-col min-h-screen px-4 pt-5 pb-8">
+          {/* ── 상단 헤더 ── */}
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={() => setPhase("modeSelect")}
+              className="rounded-2xl border border-white/20 bg-white/8 hover:bg-white/15 active:scale-95 text-white/70 px-4 py-2 font-bold text-sm transition-all"
+            >
+              ← 홈
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 rounded-2xl bg-white/10 px-3 py-1.5">
+                <span className="text-sm">💰</span>
+                <span className="font-black text-yellow-300 text-sm">{coins}</span>
+              </div>
+              <div className="flex items-center gap-1.5 rounded-2xl bg-white/10 px-3 py-1.5">
+                <span className="text-sm">🏆</span>
+                <span className="font-black text-amber-300 text-sm">{bestScore}</span>
+              </div>
+              <button onClick={goToShop} className="rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-1.5 font-bold text-sm text-white/80 transition-all">
+                🛒
+              </button>
+            </div>
+          </div>
+
+          {/* ── 타이틀 ── */}
+          <div className="text-center mb-8">
+            <p className="font-black text-white/30 text-xs tracking-[0.25em] uppercase mb-2">SELECT YOUR WORLD</p>
+            <h1 className="font-black text-white text-3xl" style={{ textShadow: "0 0 30px rgba(255,255,255,0.2)", letterSpacing: "-0.02em" }}>
+              지역 선택
+            </h1>
+            <p className="text-white/40 text-sm mt-1.5">어떤 세계에서 수학을 배울까요?</p>
+          </div>
+
+          {/* ── 월드 카드 3장 ── */}
+          <div className="flex flex-col gap-4 max-w-md mx-auto w-full flex-1">
+            {modes.map((mode) => {
+              const wc = WORLD_CARDS[mode];
+              const typeForMode = FLAT_TYPES.find((t) => t.mode === mode);
+              const isCleared   = typeForMode ? clearedTypeIds.includes(typeForMode.id) : false;
+              return (
+                <button
+                  key={mode}
+                  onClick={() => enterWorld(mode)}
+                  className="relative rounded-3xl overflow-hidden text-left transition-all active:scale-97 hover:scale-[1.02]"
+                  style={{
+                    background:    wc.bgCard,
+                    border:        `2px solid ${wc.border}`,
+                    boxShadow:     `0 8px 32px ${wc.glow}, 0 2px 8px rgba(0,0,0,0.4)`,
+                    padding:       "20px 22px",
+                  }}
+                >
+                  {/* 클리어 배지 */}
+                  {isCleared && (
+                    <div className="absolute top-3 right-3 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-black text-white">
+                      ✅ 클리어
+                    </div>
+                  )}
+                  <div className="flex items-center gap-4">
+                    {/* 월드 이모지 */}
+                    <div className="flex-shrink-0 text-5xl select-none" style={{ filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.5))" }}>
+                      {wc.emoji}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {/* 배지 */}
+                      <div className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 mb-1 font-bold text-[10px]"
+                           style={{ background: `${wc.border}33`, color: "rgba(255,255,255,0.7)", border: `1px solid ${wc.border}` }}>
+                        {wc.badge}
+                      </div>
+                      <div className="font-black text-white text-lg leading-tight">{wc.title}</div>
+                      <div className="text-white/50 text-xs mt-0.5 leading-snug">{wc.desc}</div>
+                    </div>
+                    <div className="flex-shrink-0 text-white/40 text-2xl select-none">›</div>
+                  </div>
+                  {/* 노드 프리뷰 */}
+                  <div className="flex gap-2 mt-3 pt-3" style={{ borderTop: `1px solid ${wc.border}44` }}>
+                    {REGION_NODES[mode].map((n) => (
+                      <div key={n.id} className="flex-1 rounded-xl py-1.5 text-center"
+                           style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                        <div className="text-base">{n.emoji}</div>
+                        <div className="font-bold text-white/60 text-[9px] mt-0.5">{n.subLabel}</div>
+                      </div>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── 복습 숏컷 ── */}
+          {wrongQuestions.length > 0 && (
+            <div className="max-w-md mx-auto w-full mt-4">
+              <button
+                onClick={startReview}
+                className="w-full rounded-2xl py-3 font-bold text-sm text-indigo-300 transition-all active:scale-95"
+                style={{ background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.3)" }}
+              >
+                📋 오답 복습 ({wrongQuestions.length}문제)
+              </button>
+            </div>
+          )}
+        </div>
+      </main>
+    );
+  }
+
+  // ─── regionMap screen — 지역 전용 스테이지 맵 ────────────────────────────────
+  if (phase === "regionMap") {
+    const wc          = WORLD_CARDS[gameMode];
+    const nodes       = REGION_NODES[gameMode];
+    const typeForMode = FLAT_TYPES.find((t) => t.mode === gameMode) ?? FLAT_TYPES[0];
+
+    /** 노드 클릭 → 해당 난이도로 즉시 게임 시작 (CMS 미로드 시 difficultySelect 경유) */
+    const handleNodeClick = (node: RegionNodeConfig) => {
+      setSelectedDifficulty(node.difficulty);
+      if (cmsLoading) {
+        setPendingTypeId(typeForMode.id);
+        setPhase("difficultySelect");
+      } else {
+        startType(typeForMode.id, node.difficulty);
+      }
+    };
+
+    // 노드 원 크기: 첫 번째(쉬움)가 가장 크고 강조됨
+    const nodeSizes = [84, 72, 64];
+    // 경로가 지그재그로 보이도록 각 노드 오프셋
+    const nodeAligns = ["justify-start", "justify-center", "justify-end"];
+    const nodePaddings = ["pl-10", "px-0", "pr-10"];
+
+    // 모드별 스테이지 색상
+    const stageColors: Record<GameMode, { nodeFrom: string; nodeTo: string; pathColor: string; sky: string; ground: string; textShadow: string }> = {
+      grow:   { nodeFrom: "#059669", nodeTo: "#10b981", pathColor: "#6ee7b7",  sky:    "#bae6fd", ground: "#166534", textShadow: "0 2px 8px rgba(5,150,105,0.7)"   },
+      battle: { nodeFrom: "#dc2626", nodeTo: "#f97316", pathColor: "#fca5a5",  sky:    "#fed7aa", ground: "#7c2d12", textShadow: "0 2px 8px rgba(220,38,38,0.7)"  },
+      puzzle: { nodeFrom: "#4f46e5", nodeTo: "#7c3aed", pathColor: "#a5b4fc",  sky:    "#e0e7ff", ground: "#1e1b4b", textShadow: "0 2px 8px rgba(79,70,229,0.7)"  },
+    };
+    const sc = stageColors[gameMode];
+
+    return (
+      <main
+        className="min-h-screen flex flex-col overflow-hidden select-none"
+        style={{ background: `linear-gradient(180deg, ${sc.sky} 0%, ${sc.sky} 55%, ${sc.ground} 100%)` }}
+      >
+        {/* 배경 — 구름/별 장식 */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {gameMode === "grow" && ["🌸","🍃","🌸","🌿","🌸"].map((s, i) => (
+            <div key={i} className="absolute animate-star-twinkle"
+                 style={{ top: `${8+i*7}%`, left: `${6+i*18}%`, fontSize: "1.4rem", opacity: 0.35, animationDelay: `${i*0.5}s` }}>{s}</div>
+          ))}
+          {gameMode === "battle" && ["🔥","⚡","💥","🔥","⚡"].map((s, i) => (
+            <div key={i} className="absolute animate-star-twinkle"
+                 style={{ top: `${6+i*8}%`, left: `${8+i*17}%`, fontSize: "1.2rem", opacity: 0.3, animationDelay: `${i*0.4}s` }}>{s}</div>
+          ))}
+          {gameMode === "puzzle" && ["✨","💫","⭐","✨","💫"].map((s, i) => (
+            <div key={i} className="absolute animate-star-twinkle"
+                 style={{ top: `${5+i*9}%`, left: `${5+i*20}%`, fontSize: "1.1rem", opacity: 0.4, animationDelay: `${i*0.6}s` }}>{s}</div>
+          ))}
+        </div>
+
+        <div className="relative z-10 flex flex-col min-h-screen max-w-md mx-auto w-full">
+          {/* ── 상단 헤더 바 ── */}
+          <div className="flex items-center justify-between px-4 pt-4 pb-2">
+            <button
+              onClick={() => setPhase("modeSelect")}
+              className="rounded-2xl border border-black/15 bg-white/70 hover:bg-white/90 active:scale-95 text-slate-700 px-4 py-2 font-bold text-sm transition-all backdrop-blur-sm"
+            >
+              ← 홈
+            </button>
+            <div className="flex items-center gap-2">
+              {cmsLoading
+                ? <span className="text-xs font-bold text-slate-600 animate-pulse bg-white/60 rounded-full px-2.5 py-1">⏳ 준비 중</span>
+                : <span className="text-xs font-bold text-emerald-700 bg-white/60 rounded-full px-2.5 py-1">✓ {cmsPool.length}문제</span>
+              }
+              <button onClick={goToShop}
+                className="rounded-xl bg-white/70 hover:bg-white/90 active:scale-95 px-3 py-1.5 font-bold text-sm text-slate-600 transition-all backdrop-blur-sm">
+                🛒
+              </button>
+            </div>
+          </div>
+
+          {/* ── 월드 제목 (맵 스타일) ── */}
+          <div className="text-center px-4 pt-3 pb-5">
+            <div className="text-4xl mb-1" style={{ filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.3))" }}>
+              {wc.emoji}
+            </div>
+            <div className="font-black text-slate-900 text-xl leading-tight" style={{ textShadow: "0 1px 4px rgba(255,255,255,0.8)" }}>
+              {wc.title}
+            </div>
+            <div className="font-bold text-slate-600 text-xs mt-0.5 tracking-wide uppercase">
+              {wc.subtitle} · STAGE SELECT
+            </div>
+          </div>
+
+          {/* ── 스테이지 노드 맵 ── */}
+          <div className="flex-1 px-4 pb-6 flex flex-col">
+            {nodes.map((node, idx) => {
+              const nodeSize = nodeSizes[idx] ?? 64;
+              const isFirst  = idx === 0;
+              return (
+                <div key={node.id}>
+                  {/* 경로 라인 */}
+                  {idx > 0 && (
+                    <div
+                      className={`flex ${nodeAligns[idx % 3]} h-12 items-center`}
+                      style={{ paddingLeft: idx % 2 === 0 ? "3.5rem" : "0", paddingRight: idx % 2 !== 0 ? "3.5rem" : "0" }}
+                    >
+                      <svg width="40" height="48" viewBox="0 0 40 48" className="overflow-visible">
+                        <path
+                          d={idx % 2 === 0
+                            ? "M 20 0 C 20 20, 8 28, 8 48"
+                            : "M 20 0 C 20 20, 32 28, 32 48"}
+                          fill="none"
+                          stroke={sc.pathColor}
+                          strokeWidth="4"
+                          strokeLinecap="round"
+                          strokeDasharray="6 4"
+                        />
+                      </svg>
+                    </div>
+                  )}
+
+                  {/* 노드 행 */}
+                  <div className={`flex ${nodeAligns[idx]} ${nodePaddings[idx]}`}>
+                    <div className="flex flex-col items-center">
+                      {/* 원형 노드 버튼 */}
+                      <button
+                        onClick={() => handleNodeClick(node)}
+                        className="relative flex items-center justify-center rounded-full transition-all active:scale-90"
+                        style={{
+                          width:     nodeSize,
+                          height:    nodeSize,
+                          background: `linear-gradient(135deg, ${sc.nodeFrom}, ${sc.nodeTo})`,
+                          boxShadow:  `0 0 0 ${isFirst ? 8 : 5}px ${sc.pathColor}66, 0 8px 24px ${wc.glow}`,
+                        }}
+                      >
+                        {/* 펄스 링 (첫 번째 = 권장 스테이지) */}
+                        {isFirst && (
+                          <div
+                            className="absolute inset-0 rounded-full animate-ping pointer-events-none"
+                            style={{ background: `${sc.pathColor}44`, animationDuration: "2.2s" }}
+                          />
+                        )}
+
+                        {/* 스테이지 번호 뱃지 */}
+                        <div
+                          className="absolute top-0 right-0 w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] text-white"
+                          style={{ background: "rgba(0,0,0,0.45)", top: -4, right: -4, border: "2px solid white" }}
+                        >
+                          {idx + 1}
+                        </div>
+
+                        {/* 이모지 */}
+                        <span style={{ fontSize: nodeSize * 0.42 }}>{node.emoji}</span>
+                      </button>
+
+                      {/* 이름 + 설명 (노드 아래) */}
+                      <div className="mt-2 text-center" style={{ maxWidth: "96px" }}>
+                        <div
+                          className="font-black text-slate-900 leading-tight"
+                          style={{ fontSize: isFirst ? "13px" : "11px", textShadow: "0 1px 3px rgba(255,255,255,0.9)" }}
+                        >
+                          {node.label}
+                        </div>
+                        <div className="font-bold text-slate-600 text-[10px] leading-tight mt-0.5">
+                          {node.description}
+                        </div>
+                        {/* 난이도 뱃지: 별(★)로 표시 */}
+                        <div
+                          className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 mt-1 font-black text-[9px]"
+                          style={{
+                            background: node.difficulty === "easy"
+                              ? "rgba(16,185,129,0.12)"
+                              : node.difficulty === "normal"
+                              ? "rgba(245,158,11,0.12)"
+                              : "rgba(239,68,68,0.12)",
+                            color: node.difficulty === "easy" ? "#059669"
+                              : node.difficulty === "normal" ? "#d97706" : "#dc2626",
+                            border: `1px solid ${node.difficulty === "easy" ? "rgba(16,185,129,0.3)" : node.difficulty === "normal" ? "rgba(245,158,11,0.3)" : "rgba(239,68,68,0.3)"}`,
+                          }}
+                        >
+                          {node.difficulty === "easy" ? "★☆☆" : node.difficulty === "normal" ? "★★☆" : "★★★"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── 하단 — 복습 숏컷 (오답 있을 때만) ── */}
+          {wrongQuestions.length > 0 && (
+            <div className="px-4 pb-5">
+              <button
+                onClick={startReview}
+                className="w-full rounded-2xl py-2.5 font-bold text-sm transition-all active:scale-95"
+                style={{ background: "rgba(255,255,255,0.7)", color: "#4f46e5", border: "1px solid rgba(99,102,241,0.3)", backdropFilter: "blur(8px)" }}
+              >
+                📋 복습 ({wrongQuestions.length})
+              </button>
+            </div>
+          )}
+        </div>
+      </main>
     );
   }
 
@@ -2721,7 +3161,7 @@ export default function MathGame() {
         bg:       "linear-gradient(180deg,#1e1b4b 0%,#312e81 45%,#1e3a5f 100%)",
         btnBg:    "linear-gradient(135deg,#4f46e5,#0ea5e9)",
         btnGlow:  "0 8px 32px rgba(79,70,229,0.5), 0 0 0 2px rgba(255,255,255,0.15)",
-        btnText:  "🧩 퍼즐 시작!",
+        btnText:  "🧩 복습 시작!",
         particles:["🔮","💫","✨","⭐"],
       },
     };
@@ -2761,7 +3201,7 @@ export default function MathGame() {
           {/* 뒤로가기 */}
           <div className="w-full max-w-sm flex justify-start">
             <button
-              onClick={() => setPhase("ready")}
+              onClick={() => setPhase("regionMap")}
               className="rounded-2xl border border-white/20 bg-white/10 hover:bg-white/20 active:scale-95 text-white px-4 py-2 font-bold text-sm transition-all backdrop-blur-sm"
             >
               ← 맵으로
@@ -2819,12 +3259,22 @@ export default function MathGame() {
                 </div>
               </div>
 
-              {/* 스테이지 정보 */}
+              {/* 말풍선 + 스테이지 정보 */}
+              <div className="mx-4 mb-1 px-4 py-2 rounded-2xl text-center animate-pop-in"
+                   style={{ background: "rgba(220,38,38,0.12)", border: "1px solid rgba(220,38,38,0.25)" }}>
+                <span className="font-black text-red-300" style={{ fontSize: "14px" }}>
+                  ⚠️ 적이 나타났어요! 준비하세요!
+                </span>
+              </div>
               <div className="mx-4 mb-4 rounded-2xl px-4 py-3" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-0.5">
                   <span className="text-lg">{ps.emoji}</span>
-                  <span className="font-black text-white" style={{ fontSize: "15px" }}>{ps.title}</span>
+                  <span className="font-black text-white" style={{ fontSize: "15px" }}>{ps.zoneName}</span>
+                  <span className="ml-auto text-[10px] font-bold rounded-full px-2 py-0.5 text-white/70" style={{ background: "rgba(255,255,255,0.12)" }}>
+                    {GAME_MODE_META[gameMode].emoji} {GAME_MODE_META[gameMode].label} 모드
+                  </span>
                 </div>
+                <div className="text-white/40 mb-1" style={{ fontSize: "11px" }}>{ps.title}</div>
                 <div className="flex items-center gap-3 flex-wrap">
                   <div className="flex items-center gap-0.5">
                     {Array.from({ length: 3 }).map((_, i) => <span key={i} className="text-sm">❤️</span>)}
@@ -2874,13 +3324,14 @@ export default function MathGame() {
                 />
                 <div className="text-center">
                   <div
-                    className="font-black text-white mb-1"
-                    style={{ fontSize: "clamp(14px,4vw,17px)", letterSpacing: "-0.01em" }}
+                    className="font-black text-white mb-0.5"
+                    style={{ fontSize: "clamp(15px,4vw,18px)", letterSpacing: "-0.01em" }}
                   >
-                    {ps.emoji} {ps.title}
+                    {ps.emoji} {ps.zoneName}
                   </div>
+                  <div className="text-emerald-300/70 mb-1" style={{ fontSize: "11px" }}>{ps.title}</div>
                   <p className="font-semibold text-emerald-300" style={{ fontSize: "13px" }}>
-                    차근차근 실력을 키워볼까요? 💪
+                    훈련을 시작해볼까요? 💪
                   </p>
                 </div>
 
@@ -2936,11 +3387,12 @@ export default function MathGame() {
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                   />
                   <div>
-                    <div className="font-black text-white mb-1" style={{ fontSize: "clamp(13px,3.5vw,16px)", letterSpacing: "-0.01em" }}>
-                      {ps.emoji} {ps.title}
+                    <div className="font-black text-white mb-0.5" style={{ fontSize: "clamp(13px,3.5vw,16px)", letterSpacing: "-0.01em" }}>
+                      {ps.emoji} {ps.zoneName}
                     </div>
+                    <div className="text-indigo-300/60 mb-1" style={{ fontSize: "10px" }}>{ps.title}</div>
                     <p className="font-semibold text-indigo-300" style={{ fontSize: "13px" }}>
-                      퍼즐 조각을 모두 모아봐요! 🔮
+                      기억 조각을 복구해볼까요? 🔮
                     </p>
                   </div>
                 </div>
@@ -4047,48 +4499,79 @@ export default function MathGame() {
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-4 gap-2">
-          <StatCard label="SCORE" value={String(score)}              valueColor="text-yellow-500" />
-          <div
-            className="game-card rounded-2xl p-3 text-center"
-            style={{
-              background:     "rgba(255,255,255,0.92)",
-              backdropFilter: "blur(10px)",
-              border:         "1.5px solid rgba(255,255,255,0.7)",
-              boxShadow:      "0 4px 20px rgba(79,70,229,0.1), inset 0 1px 2px rgba(255,255,255,0.9)",
-            }}
-          >
-            <div className="ty-stat-label mb-1">TIME</div>
-            <div className={`ty-stat-value ${timerColor}`}>{timeLeft}s</div>
-            <div className="mt-1.5 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.1)" }}>
-              <div
-                className={`h-full rounded-full transition-all duration-1000 ${timerBarColor}`}
-                style={{ width: `${timerPct}%` }}
-              />
+        {/* Stats row — 지역 모드별로 표시 내용이 다름 */}
+        {(() => {
+          // TIME 카드는 모든 모드 공통 (2번째 칸)
+          const timeCard = (
+            <div
+              className="game-card rounded-2xl p-3 text-center"
+              style={{
+                background:     "rgba(255,255,255,0.92)",
+                backdropFilter: "blur(10px)",
+                border:         "1.5px solid rgba(255,255,255,0.7)",
+                boxShadow:      "0 4px 20px rgba(79,70,229,0.1), inset 0 1px 2px rgba(255,255,255,0.9)",
+              }}
+            >
+              <div className="ty-stat-label mb-1">TIME</div>
+              <div className={`ty-stat-value ${timerColor}`}>{timeLeft}s</div>
+              <div className="mt-1.5 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.1)" }}>
+                <div className={`h-full rounded-full transition-all duration-1000 ${timerBarColor}`} style={{ width: `${timerPct}%` }} />
+              </div>
             </div>
-          </div>
-          <StatCard label="COMBO" value={combo > 0 ? `×${combo}` : "–"} valueColor={combo >= 5 ? "text-rose-500" : combo >= 3 ? "text-orange-400" : "text-orange-300"} />
-          {/* Coins — flashes when earned */}
-          <div
-            className={`game-card rounded-2xl p-3 text-center ${coinFlash ? "scale-125" : ""}`}
-            style={{
-              background:     coinFlash ? "rgba(245,158,11,0.22)" : "rgba(255,255,255,0.92)",
-              backdropFilter: "blur(10px)",
-              border:         coinFlash ? "1.5px solid rgba(245,158,11,0.7)" : "1.5px solid rgba(255,255,255,0.7)",
-              boxShadow:      coinFlash
-                ? "0 0 20px rgba(245,158,11,0.55), 0 4px 16px rgba(245,158,11,0.2)"
-                : "0 4px 20px rgba(79,70,229,0.1), inset 0 1px 2px rgba(255,255,255,0.9)",
-              transition:     "background 0.22s, border 0.22s, box-shadow 0.22s, transform 0.15s",
-            }}
-          >
-            <div className="ty-stat-label mb-1">COINS</div>
-            <div className="ty-stat-value text-yellow-500">💰{coins}</div>
-          </div>
-        </div>
+          );
 
-        {/* Skill gauge row */}
-        <div
+          if (gameMode === "grow") {
+            const expPct = Math.round(Math.min((growExp / EXP_PER_LEVEL), 1) * 100);
+            return (
+              <div className="grid grid-cols-4 gap-2">
+                <StatCard label="COMBO" value={combo > 0 ? `×${combo}` : "–"}          valueColor={combo >= 5 ? "text-rose-500" : combo >= 3 ? "text-orange-400" : "text-orange-300"} />
+                {timeCard}
+                <StatCard label="정답"  value={`${correctCount}/${MONSTER_MAX_HP}`}    valueColor="text-emerald-500" />
+                <StatCard label="EXP"   value={`${expPct}%`}                           valueColor="text-teal-500" />
+              </div>
+            );
+          }
+
+          if (gameMode === "puzzle") {
+            const filledPieces = Math.round((correctCount / MONSTER_MAX_HP) * 9);
+            return (
+              <div className="grid grid-cols-4 gap-2">
+                <StatCard label="조각"  value={`${filledPieces}/9`}                   valueColor="text-violet-600" />
+                {timeCard}
+                <StatCard label="정답"  value={`${correctCount}/${MONSTER_MAX_HP}`}    valueColor="text-violet-500" />
+                <StatCard label="복습"  value={`${wrongQuestions.length}문제`}         valueColor="text-indigo-500" />
+              </div>
+            );
+          }
+
+          // battle (기본)
+          return (
+            <div className="grid grid-cols-4 gap-2">
+              <StatCard label="SCORE" value={String(score)}              valueColor="text-yellow-500" />
+              {timeCard}
+              <StatCard label="COMBO" value={combo > 0 ? `×${combo}` : "–"} valueColor={combo >= 5 ? "text-rose-500" : combo >= 3 ? "text-orange-400" : "text-orange-300"} />
+              {/* Coins — flashes when earned */}
+              <div
+                className={`game-card rounded-2xl p-3 text-center ${coinFlash ? "scale-125" : ""}`}
+                style={{
+                  background:     coinFlash ? "rgba(245,158,11,0.22)" : "rgba(255,255,255,0.92)",
+                  backdropFilter: "blur(10px)",
+                  border:         coinFlash ? "1.5px solid rgba(245,158,11,0.7)" : "1.5px solid rgba(255,255,255,0.7)",
+                  boxShadow:      coinFlash
+                    ? "0 0 20px rgba(245,158,11,0.55), 0 4px 16px rgba(245,158,11,0.2)"
+                    : "0 4px 20px rgba(79,70,229,0.1), inset 0 1px 2px rgba(255,255,255,0.9)",
+                  transition:     "background 0.22s, border 0.22s, box-shadow 0.22s, transform 0.15s",
+                }}
+              >
+                <div className="ty-stat-label mb-1">COINS</div>
+                <div className="ty-stat-value text-yellow-500">💰{coins}</div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Skill gauge + Item bar — battle 모드 전용 */}
+        {gameMode === "battle" && <div
           className="rounded-2xl px-4 py-2.5 flex items-center gap-3"
           style={{
             background: skillReady
@@ -4143,10 +4626,9 @@ export default function MathGame() {
           >
             💥 스킬
           </button>
-        </div>
+        </div>}
 
-        {/* Item bar */}
-        <div className="flex gap-2">
+        {gameMode === "battle" && <div className="flex gap-2">
           {BATTLE_ITEMS.map((item) => {
             const count    = inventory[item.id];
             const disabled = count === 0 || (item.id === "potion" && phase !== "playing");
@@ -4184,7 +4666,7 @@ export default function MathGame() {
               </button>
             );
           })}
-        </div>
+        </div>}
 
         {/* Battle arena / Grow arena / Puzzle arena */}
         {gameMode === "grow" ? (
@@ -4283,28 +4765,26 @@ export default function MathGame() {
             >
               {current.conceptTitle ?? current.conceptName}
             </span>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              {/* CMS question difficulty badge */}
-              {current.difficulty != null && (
-                <span
-                  className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-black"
-                  style={{
-                    background: current.difficulty >= 4 ? "#fef3c7" : current.difficulty >= 3 ? "#ede9fe" : "#dcfce7",
-                    color:      current.difficulty >= 4 ? "#b45309"  : current.difficulty >= 3 ? "#6d28d9"  : "#15803d",
-                  }}
-                  title={`CMS 난이도 ${current.difficulty}`}
-                >
-                  {"★".repeat(current.difficulty)}{"☆".repeat(5 - current.difficulty)}
-                </span>
-              )}
-              <span
-                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ${LEVEL_LABEL[adaptiveLevel].color}`}
-                style={{ background: "rgba(0,0,0,0.05)" }}
-                title="현재 적응 난이도"
-              >
-                {LEVEL_LABEL[adaptiveLevel].stars}
-              </span>
-            </div>
+            {/* 난이도: 별(★)만 표시 — adaptive 3-star 기준 */}
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-black ${LEVEL_LABEL[adaptiveLevel].color}`}
+              style={{
+                background: adaptiveLevel === "HIGH"
+                  ? "rgba(239,68,68,0.08)"
+                  : adaptiveLevel === "MEDIUM"
+                  ? "rgba(245,158,11,0.08)"
+                  : "rgba(16,185,129,0.08)",
+                border: adaptiveLevel === "HIGH"
+                  ? "1px solid rgba(239,68,68,0.25)"
+                  : adaptiveLevel === "MEDIUM"
+                  ? "1px solid rgba(245,158,11,0.25)"
+                  : "1px solid rgba(16,185,129,0.25)",
+              }}
+              title={`난이도: ${LEVEL_LABEL[adaptiveLevel].label}`}
+            >
+              {LEVEL_LABEL[adaptiveLevel].stars}
+              <span style={{ fontSize: "9px", opacity: 0.7 }}>{LEVEL_LABEL[adaptiveLevel].label}</span>
+            </span>
           </div>
 
           {/* ── Question display ── */}
@@ -4343,47 +4823,102 @@ export default function MathGame() {
 
           <div style={{ height: current.questionImageUrl ? "8px" : "16px" }} />
 
-          {/* ── 플레이어 HP 하트 바 ── */}
-          <div
-            className="mx-4 rounded-2xl px-4 py-2 flex items-center justify-between"
-            style={{
-              background: playerLives <= 1
-                ? "linear-gradient(135deg,rgba(239,68,68,0.12),rgba(185,28,28,0.08))"
-                : "rgba(79,70,229,0.06)",
-              border: playerLives <= 1
-                ? "1.5px solid rgba(239,68,68,0.3)"
-                : "1.5px solid rgba(79,70,229,0.12)",
-            }}
-          >
-            {/* 플레이어 캐릭터 아이콘 */}
-            <div className="flex items-center gap-2">
-              <img
-                src={selectedCharacter}
-                alt="나"
-                style={{ width: 28, height: 28, objectFit: "contain" }}
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-              />
-              <span className="font-black text-slate-600" style={{ fontSize: "12px" }}>나</span>
+          {/* ── 플레이어 상태 바 (모드별 분기) ── */}
+          {gameMode === "battle" ? (
+            /* 전투: 하트 HP */
+            <div
+              className="mx-4 rounded-2xl px-4 py-2 flex items-center justify-between"
+              style={{
+                background: playerLives <= 1
+                  ? "linear-gradient(135deg,rgba(239,68,68,0.12),rgba(185,28,28,0.08))"
+                  : "rgba(79,70,229,0.06)",
+                border: playerLives <= 1
+                  ? "1.5px solid rgba(239,68,68,0.3)"
+                  : "1.5px solid rgba(79,70,229,0.12)",
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <img src={selectedCharacter} alt="나" style={{ width: 28, height: 28, objectFit: "contain" }}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                <span className="font-black text-slate-600" style={{ fontSize: "12px" }}>나</span>
+              </div>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: MAX_PLAYER_LIVES }).map((_, i) => (
+                  <span key={i}
+                    className={i < playerLives ? (playerLives <= 1 ? "animate-pulse" : "") : "opacity-20"}
+                    style={{ fontSize: "20px", transition: "opacity 0.3s" }}
+                  >
+                    {i < playerLives ? "❤️" : "🖤"}
+                  </span>
+                ))}
+              </div>
+              {shieldActive && (
+                <span className="text-sm font-black text-blue-500 animate-pulse">🛡️ 방어 중</span>
+              )}
             </div>
-
-            {/* 하트 */}
-            <div className="flex items-center gap-1">
-              {Array.from({ length: MAX_PLAYER_LIVES }).map((_, i) => (
-                <span
-                  key={i}
-                  className={i < playerLives ? (playerLives <= 1 ? "animate-pulse" : "") : "opacity-20"}
-                  style={{ fontSize: "20px", transition: "opacity 0.3s" }}
-                >
-                  {i < playerLives ? "❤️" : "🖤"}
+          ) : gameMode === "grow" ? (
+            /* 성장: 플레이어 LV + EXP 진행 바 */
+            <div
+              className="mx-4 rounded-2xl px-4 py-2.5"
+              style={{ background: "rgba(16,185,129,0.08)", border: "1.5px solid rgba(16,185,129,0.2)" }}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2">
+                  <img src={selectedCharacter} alt="나" style={{ width: 26, height: 26, objectFit: "contain" }}
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                  {/* LV = 플레이어 성장 레벨 (여기에만 표시) */}
+                  <span
+                    className="rounded-full px-2 py-0.5 font-black text-white"
+                    style={{ fontSize: "11px", background: "linear-gradient(135deg,#10b981,#059669)", boxShadow: "0 2px 6px rgba(16,185,129,0.4)" }}
+                  >
+                    LV.{growLevel}
+                  </span>
+                </div>
+                <span className="font-bold text-emerald-600" style={{ fontSize: "11px" }}>
+                  EXP {growExp} / {EXP_PER_LEVEL}
                 </span>
-              ))}
+              </div>
+              <div className="rounded-full overflow-hidden h-2.5" style={{ background: "rgba(0,0,0,0.08)" }}>
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min((growExp / EXP_PER_LEVEL) * 100, 100)}%`,
+                    background: "linear-gradient(90deg,#34d399,#10b981)",
+                    boxShadow: "0 0 8px rgba(16,185,129,0.5)",
+                  }}
+                />
+              </div>
             </div>
-
-            {/* 방어 상태 */}
-            {shieldActive && (
-              <span className="text-sm font-black text-blue-500 animate-pulse">🛡️ 방어 중</span>
-            )}
-          </div>
+          ) : (
+            /* 퍼즐: 조각 수집 진행 */
+            <div
+              className="mx-4 rounded-2xl px-4 py-2 flex items-center gap-3"
+              style={{ background: "rgba(99,102,241,0.08)", border: "1.5px solid rgba(99,102,241,0.2)" }}
+            >
+              <img src={selectedCharacter} alt="나" style={{ width: 24, height: 24, objectFit: "contain" }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+              <div className="flex-1">
+                <div className="flex justify-between mb-1" style={{ fontSize: "10px" }}>
+                  <span className="font-bold text-violet-600">🧩 퍼즐 조각</span>
+                  <span className="font-black text-violet-700">
+                    {Math.round((correctCount / MONSTER_MAX_HP) * 9)} / 9
+                  </span>
+                </div>
+                <div className="rounded-full overflow-hidden h-2" style={{ background: "rgba(0,0,0,0.08)" }}>
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${(correctCount / MONSTER_MAX_HP) * 100}%`,
+                      background: "linear-gradient(90deg,#a78bfa,#7c3aed)",
+                    }}
+                  />
+                </div>
+              </div>
+              <span className="font-black text-violet-500" style={{ fontSize: "11px" }}>
+                {wrongQuestions.length > 0 ? `📋 복습 ${wrongQuestions.length}개` : "🎯 도전 중"}
+              </span>
+            </div>
+          )}
 
           {/* Answer input */}
           <div className="px-4 pb-5 flex flex-col gap-3">
@@ -4464,8 +4999,6 @@ function WorldMap({
   onCloseTutorial,
   onToggleSound,
   onGoHome,
-  gameMode,
-  onSetGameMode,
 }: {
   unlockedTypeId:    number;
   clearedTypeIds:    number[];
@@ -4505,8 +5038,6 @@ function WorldMap({
   onCloseTutorial:     () => void;
   onToggleSound:       () => void;
   onGoHome:            () => void;
-  gameMode:            GameMode;
-  onSetGameMode:       (mode: GameMode) => void;
 }) {
   const allCleared = clearedTypeIds.length >= FLAT_TYPES.length;
 
@@ -4629,35 +5160,6 @@ function WorldMap({
             </button>
           ))}
         </nav>
-
-        {/* ── Game mode selector row ── */}
-        <div className="flex gap-1 px-3 pb-2" style={{ maxWidth: "900px", margin: "0 auto" }}>
-          {(["battle", "grow", "puzzle"] as GameMode[]).map((m) => {
-            const meta   = GAME_MODE_META[m];
-            const active = gameMode === m;
-            return (
-              <button
-                key={m}
-                onClick={() => onSetGameMode(m)}
-                className="game-btn flex-1 rounded-2xl py-2.5 px-2 font-black flex items-center justify-center gap-1.5"
-                style={{
-                  fontSize:      "15px",
-                  letterSpacing: "-0.01em",
-                  background:    active
-                    ? "linear-gradient(135deg,#4f46e5,#6366f1)"
-                    : "#f1f5f9",
-                  color:         active ? "#fff" : "#64748b",
-                  boxShadow:     active
-                    ? "0 4px 16px rgba(79,70,229,0.35)"
-                    : "none",
-                }}
-              >
-                <span>{meta.emoji}</span>
-                <span>{meta.label}</span>
-              </button>
-            );
-          })}
-        </div>
 
         {/* ── Mission accordion (compact) ── */}
         {(() => {
@@ -4857,18 +5359,20 @@ function WorldMap({
           const typeNodes = chapter.types.map((t, tIdx) => {
             const flatTypeIdx = FLAT_TYPES.findIndex((ft) => ft.id === t.id);
             const isCleared   = clearedTypeIds.includes(t.id);
-            const isCurrent   = t.id === unlockedTypeId && !allCleared;
-            const isLocked    = getTypeIndex(t.id) > getTypeIndex(unlockedTypeId);
+            // 각 지역이 독립적인 게임 모드이므로 잠금 없음 — 모든 지역에서 플레이 가능
+            const isLocked    = false;
+            // 진행 강조 표시: 아직 클리어하지 않은 지역 (= 도전 가능)
+            const isCurrent   = !isCleared && !allCleared;
             const isLeft      = tIdx % 2 === 0;
             const prevIsLeft  = tIdx > 0 ? (tIdx - 1) % 2 === 0 : true;
             const stageNum    = flatTypeIdx + 1;
+            // 클리어한 지역은 작게, 아직 안 한 지역은 크게 표시
             const nodeSize    = isCurrent ? 88 : 72;
 
             // Path + node colours
-            const pathColor = isLocked ? "#cbd5e1" : isCleared ? "#10b981" : isCurrent ? "#3b82f6" : "#94a3b8";
+            const pathColor = isCleared ? "#10b981" : isCurrent ? "#3b82f6" : "#94a3b8";
 
             const handleSelect = () => {
-              if (isLocked) return;
               setClickedNodeId(t.id);
               setTimeout(() => setClickedNodeId(null), 700);
               onSelectStage(t.id);
@@ -5021,6 +5525,7 @@ function WorldMap({
 
                     {/* ── Label below node ── */}
                     <div className="text-center" style={{ maxWidth: "128px" }}>
+                      {/* 지역 이름 */}
                       <div
                         className="font-black leading-tight"
                         style={{
@@ -5032,63 +5537,88 @@ function WorldMap({
                           overflow: "hidden",
                         }}
                       >
-                        {isLocked ? "???" : t.title}
+                        {isLocked ? "???" : t.zoneName}
                       </div>
+                      {/* 모드 배지 */}
+                      {!isLocked && (
+                        <div
+                          className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 mt-1 font-bold"
+                          style={{
+                            fontSize: "9px",
+                            background: isCleared ? "rgba(5,150,105,0.12)" : "rgba(0,0,0,0.05)",
+                            color: isCleared ? "#059669" : "#64748b",
+                          }}
+                        >
+                          {GAME_MODE_META[t.mode].emoji} {GAME_MODE_META[t.mode].label}
+                        </div>
+                      )}
                       <div
                         className="font-semibold mt-0.5"
                         style={{ fontSize: "11px", color: isCleared ? "#10b981" : isCurrent ? "#3b82f6" : "#94a3b8" }}
                       >
-                        {isLocked ? "🔒 잠김" : isCleared ? "🚩 클리어" : isCurrent ? "▶ 도전 중" : `⚔️ ${t.monsterName}`}
+                        {isLocked ? "🔒 잠김" : isCleared ? "🚩 클리어" : isCurrent ? ZONE_STATUS_TEXT[t.mode] : `${GAME_MODE_META[t.mode].emoji} ${t.monsterName}`}
                       </div>
                     </div>
 
-                    {/* ── CURRENT NODE — expanded info card below ── */}
-                    {isCurrent && (
-                      <div
-                        className="animate-pop-in rounded-2xl overflow-hidden"
-                        style={{
-                          width: "calc(min(260px, 80vw))",
-                          marginTop: "2px",
-                          background: "rgba(255,255,255,0.97)",
-                          backdropFilter: "blur(10px)",
-                          border: "2px solid #bfdbfe",
-                          boxShadow: "0 10px 32px rgba(37,99,235,0.2), 0 2px 8px rgba(0,0,0,0.08)",
-                        }}
-                      >
-                        {/* Monster alert */}
+                    {/* ── 진입 가능 지역 — 모드별 info 카드 ── */}
+                    {!isCleared && (() => {
+                      // 지역 모드에 따른 카드 테마
+                      const zoneTheme = {
+                        grow:   { bannerBg: "linear-gradient(90deg,#d1fae5,#a7f3d0)", bannerBorder: "#6ee7b7", bannerIcon: "🌱", bannerText: `${t.zoneName}에 도착!`,          bannerSub: "훈련", btnBg: "linear-gradient(135deg,#059669,#10b981)", ctaText: "🌱 훈련 시작!", cardBorder: "#6ee7b7", cardShadow: "rgba(16,185,129,0.2)" },
+                        battle: { bannerBg: "linear-gradient(90deg,#fef3c7,#fde68a)", bannerBorder: "#fcd34d", bannerIcon: "⚔️", bannerText: `${t.monsterName}이(가) 나타났다!`, bannerSub: "위험", btnBg: "linear-gradient(135deg,#dc2626,#7c3aed)", ctaText: "⚔️ 전투 시작!", cardBorder: "#fca5a5", cardShadow: "rgba(220,38,38,0.2)" },
+                        puzzle: { bannerBg: "linear-gradient(90deg,#ede9fe,#ddd6fe)", bannerBorder: "#c4b5fd", bannerIcon: "🧩", bannerText: `${t.zoneName} 복습!`,           bannerSub: "복습", btnBg: "linear-gradient(135deg,#4f46e5,#0ea5e9)", ctaText: "🧩 복습 시작!", cardBorder: "#c4b5fd", cardShadow: "rgba(99,102,241,0.2)" },
+                      }[t.mode];
+                      return (
                         <div
-                          className="flex items-center gap-2 px-4 py-2"
-                          style={{ background: "linear-gradient(90deg,#fef3c7,#fde68a)", borderBottom: "1px solid #fcd34d" }}
+                          className="animate-pop-in rounded-2xl overflow-hidden"
+                          style={{
+                            width: "calc(min(260px, 80vw))",
+                            marginTop: "2px",
+                            background: "rgba(255,255,255,0.97)",
+                            backdropFilter: "blur(10px)",
+                            border: `2px solid ${zoneTheme.cardBorder}`,
+                            boxShadow: `0 10px 32px ${zoneTheme.cardShadow}, 0 2px 8px rgba(0,0,0,0.08)`,
+                          }}
                         >
-                          <span style={{ fontSize: "14px" }}>⚔️</span>
-                          <span className="font-black text-amber-800 animate-pulse" style={{ fontSize: "12px" }}>
-                            {t.monsterName}이(가) 나타났다!
-                          </span>
-                          <span className="ml-auto font-bold text-amber-600" style={{ fontSize: "10px" }}>위험</span>
-                        </div>
-                        <div className="px-4 py-3">
-                          <p
-                            className="font-black text-slate-800 leading-snug mb-3"
-                            style={{
-                              fontSize: "clamp(12px,3.2vw,14px)",
-                              display: "-webkit-box",
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: "vertical",
-                              overflow: "hidden",
-                            }}
+                          {/* Zone alert banner */}
+                          <div
+                            className="flex items-center gap-2 px-4 py-2"
+                            style={{ background: zoneTheme.bannerBg, borderBottom: `1px solid ${zoneTheme.bannerBorder}` }}
                           >
-                            {t.title}
-                          </p>
-                          <button
-                            onClick={handleSelect}
-                            className="w-full rounded-xl py-2.5 font-black text-sm text-white game-btn"
-                            style={{ background: "linear-gradient(135deg,#2563eb,#4f46e5)", letterSpacing: "-0.01em" }}
-                          >
-                            🗡️ 전투 시작!
-                          </button>
+                            <span style={{ fontSize: "14px" }}>{zoneTheme.bannerIcon}</span>
+                            <span className="font-black text-slate-800 animate-pulse" style={{ fontSize: "12px" }}>
+                              {zoneTheme.bannerText}
+                            </span>
+                            <span className="ml-auto font-bold text-slate-500" style={{ fontSize: "10px" }}>{zoneTheme.bannerSub}</span>
+                          </div>
+                          <div className="px-4 py-3">
+                            {/* 지역명 + 수학 개념 */}
+                            <p className="font-black text-slate-800 leading-snug" style={{ fontSize: "14px" }}>
+                              {t.zoneName}
+                            </p>
+                            <p
+                              className="text-slate-500 mt-0.5 mb-3"
+                              style={{
+                                fontSize: "11px",
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {t.title}
+                            </p>
+                            <button
+                              onClick={handleSelect}
+                              className="w-full rounded-xl py-2.5 font-black text-sm text-white game-btn"
+                              style={{ background: zoneTheme.btnBg, letterSpacing: "-0.01em" }}
+                            >
+                              {zoneTheme.ctaText}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
