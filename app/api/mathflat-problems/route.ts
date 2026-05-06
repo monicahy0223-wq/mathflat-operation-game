@@ -79,6 +79,59 @@ function isSingleNumber(s: string): boolean {
   return /^-?\d+(\.\d+)?$/.test((s ?? "").trim());
 }
 
+/**
+ * answerData 필드에서 가능한 정답 후보를 모두 추출합니다.
+ * - 문자열(단일 숫자): [값 자체]
+ * - JSON 배열:         각 요소를 문자열로 변환
+ * - JSON 객체:         answer / correctAnswer / answers / solutionAnswer / score.answer 탐색
+ * - 파싱 실패:         원문 그대로 반환
+ */
+function extractAnswerCandidates(raw: string): string[] {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return [];
+
+  // 단순 숫자 문자열 → 추가 파싱 불필요
+  if (isSingleNumber(trimmed)) return [trimmed];
+
+  // JSON 파싱 시도
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    // 파싱 실패 → 원문 반환
+    return [trimmed];
+  }
+
+  if (Array.isArray(parsed)) {
+    return parsed.map((v) => String(v).trim()).filter(Boolean);
+  }
+
+  if (typeof parsed === "object" && parsed !== null) {
+    const obj = parsed as Record<string, unknown>;
+    // 우선순위: answer > correctAnswer > answers(배열) > solutionAnswer > score.answer
+    const candidates: string[] = [];
+    const addField = (v: unknown) => {
+      if (typeof v === "string" && v.trim()) candidates.push(v.trim());
+      else if (typeof v === "number") candidates.push(String(v));
+      else if (Array.isArray(v)) v.forEach((x) => addField(x));
+    };
+    addField(obj["answer"]);
+    addField(obj["correctAnswer"]);
+    addField(obj["answers"]);
+    addField(obj["solutionAnswer"]);
+    // score.answer 탐색
+    if (typeof obj["score"] === "object" && obj["score"] !== null) {
+      addField((obj["score"] as Record<string, unknown>)["answer"]);
+    }
+    if (candidates.length) return [...new Set(candidates)];
+  }
+
+  // 숫자로 직접 변환된 경우
+  if (typeof parsed === "number") return [String(parsed)];
+
+  return [trimmed];
+}
+
 /** Safely cast an unknown item to CmsProblem if it has the required fields. */
 function isCmsProblem(p: unknown): p is CmsProblem {
   return (
@@ -227,20 +280,27 @@ export async function GET(
 
   // ── 6. Map to GameQuestion (flat field access) ─────────────────────────────
   const questions: GameQuestion[] = afterNumeric.map(
-    (p): GameQuestion => ({
-      id:               p.id,
-      stageId:          p.conceptId,
-      conceptName:      p.unitName ?? "",
-      text:             "",
-      answer:           p.answerData.trim(),
-      level:            mapLevel(p.problemLevel),
-      questionImageUrl: p.problemImageUri  ?? "",
-      solutionImageUrl: p.solutionImageUri ?? "",
-      autoScoringType:  p.autoScoringType ?? 1,
-      conceptId:        p.conceptId,
-      conceptTitle:     p.unitName ?? "",
-      difficulty:       mapDifficulty(p.problemLevel),
-    }),
+    (p): GameQuestion => {
+      const candidates = extractAnswerCandidates(p.answerData);
+      // candidates[0] 을 primary answer 로, 나머지를 answerCandidates 로 분리
+      const primaryAnswer  = candidates[0] ?? p.answerData.trim();
+      const extraCandidates = candidates.slice(1);
+      return {
+        id:               p.id,
+        stageId:          p.conceptId,
+        conceptName:      p.unitName ?? "",
+        text:             "",
+        answer:           primaryAnswer,
+        answerCandidates: extraCandidates.length ? extraCandidates : undefined,
+        level:            mapLevel(p.problemLevel),
+        questionImageUrl: p.problemImageUri  ?? "",
+        solutionImageUrl: p.solutionImageUri ?? "",
+        autoScoringType:  p.autoScoringType ?? 1,
+        conceptId:        p.conceptId,
+        conceptTitle:     p.unitName ?? "",
+        difficulty:       mapDifficulty(p.problemLevel),
+      };
+    },
   );
 
   return NextResponse.json({

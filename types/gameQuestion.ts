@@ -41,6 +41,12 @@ export type GameQuestion = {
    */
   difficulty?:   number;
   /**
+   * 추가 정답 후보 목록.
+   * CMS answerData 가 JSON 배열/객체인 경우 API 라우트에서 분해하여 저장합니다.
+   * checkAnswerResult 에서 correctAnswer(answer 필드)와 합산하여 비교합니다.
+   */
+  answerCandidates?: string[];
+  /**
    * true = CMS 호출 실패 또는 필터 결과 0개로 인한 fallback mock 문제.
    * CMS 문제에는 이 필드가 없거나 undefined.
    */
