@@ -161,7 +161,9 @@ function selectQuestionsForMode(
   if (mode === "grow") {
     const easy   = pool.filter((q) => (q.difficulty ?? 1) <= 3);
     const hard4  = pool.filter((q) => (q.difficulty ?? 1) === 4 && Math.random() < 0.2);
-    return shuffleArr([...easy, ...hard4]).slice(0, maxCount);
+    const result = shuffleArr([...easy, ...hard4]).slice(0, maxCount);
+    // Guard: if mode filter removes everything, use the full CMS pool rather than returning empty
+    return result.length > 0 ? result : shuffleArr(pool).slice(0, maxCount);
   }
 
   if (mode === "battle") {
@@ -1620,7 +1622,7 @@ export default function MathGame() {
                 stageId:          currentTypeId,
                 questionImageUrl: current.questionImageUrl,
                 solutionImageUrl: current.solutionImageUrl,
-                source:           cmsQuestions.length > 0 ? "cms" : "mock",
+                source:           current.isMock ? "mock" : "cms",
               }]
         );
 
@@ -1694,11 +1696,29 @@ export default function MathGame() {
     const cfg = DIFFICULTY_CONFIG[difficulty];
 
     // ── Select mode-specific questions from the CMS pool ──────────────────────
-    const sessionQuestions =
-      cmsPool.length > 0
-        ? selectQuestionsForMode(cmsPool, gameMode, wrongQuestionIds)
-        : [];
-    const activePool = sessionQuestions.length > 0 ? sessionQuestions : getQuestionsForStage(typeId);
+    const hasCmsPool = cmsPool.length > 0;
+    const sessionQuestions = hasCmsPool
+      ? selectQuestionsForMode(cmsPool, gameMode, wrongQuestionIds)
+      : [];
+
+    // Fallback policy:
+    // 1. CMS mode-filtered questions (preferred)
+    // 2. Full CMS pool shuffled — when CMS has data but mode filter yielded nothing
+    // 3. Mock questions — ONLY when CMS fetch failed or pool is empty
+    const activePool =
+      sessionQuestions.length > 0
+        ? sessionQuestions
+        : hasCmsPool
+          ? shuffleArr(cmsPool).slice(0, 15)
+          : getQuestionsForStage(typeId);
+
+    const usingMock = !hasCmsPool;
+    if (usingMock && process.env.NODE_ENV !== "production") {
+      console.warn(
+        `[MOCK] conceptId=${typeId} | CMS 문제 없음 → mock fallback 사용` +
+        ` (cmsPool=0, 게임모드=${gameMode})`,
+      );
+    }
 
     // ── Difficulty rules from CMS median difficulty ────────────────────────────
     const med     = medianDifficulty(sessionQuestions);
@@ -2812,8 +2832,8 @@ export default function MathGame() {
                   </div>
                   {cmsLoading
                     ? <span className="text-xs font-bold text-white/40 animate-pulse">⏳ 문제 준비 중…</span>
-                    : cmsQuestions.length > 0
-                    ? <span className="text-xs font-bold text-emerald-400">✓ 문제 {cmsQuestions.length}개 준비됨</span>
+                    : cmsPool.length > 0
+                    ? <span className="text-xs font-bold text-emerald-400">✓ 문제 {cmsPool.length}개 준비됨</span>
                     : null}
                 </div>
               </div>
@@ -2873,8 +2893,8 @@ export default function MathGame() {
                   <div className="ml-auto">
                     {cmsLoading
                       ? <span className="text-xs font-bold text-white/40 animate-pulse">⏳ 준비 중…</span>
-                      : cmsQuestions.length > 0
-                      ? <span className="text-xs font-bold text-emerald-400">✓ {cmsQuestions.length}문제</span>
+                      : cmsPool.length > 0
+                      ? <span className="text-xs font-bold text-emerald-400">✓ {cmsPool.length}문제</span>
                       : null}
                   </div>
                 </div>
@@ -2950,8 +2970,8 @@ export default function MathGame() {
                 <div className="ml-auto">
                   {cmsLoading
                     ? <span className="text-xs font-bold text-white/40 animate-pulse">⏳ 준비 중…</span>
-                    : cmsQuestions.length > 0
-                    ? <span className="text-xs font-bold text-sky-400">✓ {cmsQuestions.length}문제</span>
+                    : cmsPool.length > 0
+                    ? <span className="text-xs font-bold text-sky-400">✓ {cmsPool.length}문제</span>
                     : null}
                 </div>
               </div>
@@ -2992,14 +3012,15 @@ export default function MathGame() {
           {/* ── 시작 버튼 (모드별) ── */}
           <button
             onClick={() => startType(pendingTypeId, selectedDiff)}
-            className="w-full max-w-sm rounded-2xl py-4 font-black text-lg text-white game-btn transition-all active:scale-95"
+            disabled={cmsLoading}
+            className="w-full max-w-sm rounded-2xl py-4 font-black text-lg text-white game-btn transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background:    theme.btnBg,
               boxShadow:     theme.btnGlow,
               letterSpacing: "0.02em",
             }}
           >
-            {theme.btnText}
+            {cmsLoading ? "⏳ 문제 준비 중…" : theme.btnText}
           </button>
 
           {/* 개발자 패널 */}
@@ -3018,10 +3039,10 @@ export default function MathGame() {
                   <span>⏳</span>
                   <span className="font-bold">CMS 로드 중…</span>
                 </div>
-              ) : cmsQuestions.length > 0 ? (
+              ) : cmsPool.length > 0 ? (
                 <div className="flex items-center justify-between">
                   <span className="font-black text-emerald-300">
-                    ✓ CMS {cmsQuestions.length}개 로드됨
+                    ✓ CMS {cmsPool.length}개 로드됨
                   </span>
                   <button
                     onClick={clearCmsQuestions}
@@ -3044,9 +3065,9 @@ export default function MathGame() {
               )}
 
               {/* 문제 목록 미리보기 */}
-              {cmsQuestions.length > 0 && (
+              {cmsPool.length > 0 && (
                 <div className="flex flex-col gap-1 mt-1">
-                  {cmsQuestions.map((q, i) => (
+                  {cmsPool.map((q, i) => (
                     <div
                       key={q.id}
                       className="flex flex-col gap-0.5 rounded-xl bg-white/5 px-2.5 py-1.5"
@@ -3990,20 +4011,20 @@ export default function MathGame() {
           <div className="flex items-center gap-1.5 min-w-0">
             <div className="rounded-2xl px-3 py-1.5 text-sm font-black text-white truncate"
                  style={{ background: "rgba(0,0,0,0.28)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.2)" }}>
-              {typeInfo.emoji} {cmsQuestions.length > 0 && current?.conceptName ? current.conceptName : typeInfo.title}
+              {typeInfo.emoji} {!current?.isMock && current?.conceptName ? current.conceptName : typeInfo.title}
             </div>
-            {/* 문제 출처 배지 */}
+            {/* 문제 출처 배지: isMock 플래그 기준으로 표시 */}
             {cmsLoading ? (
               <span className="inline-flex items-center gap-0.5 rounded-full bg-white/10 border border-white/20 px-2 py-0.5 text-[10px] font-black text-white/60 flex-shrink-0 animate-pulse">
                 ⏳ 로드 중
               </span>
-            ) : cmsQuestions.length > 0 ? (
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-sky-500/30 border border-sky-400/50 px-2 py-0.5 text-[10px] font-black text-sky-200 flex-shrink-0">
-                🌐 CMS
-              </span>
-            ) : (
+            ) : current?.isMock ? (
               <span className="inline-flex items-center gap-0.5 rounded-full bg-white/10 border border-white/20 px-2 py-0.5 text-[10px] font-black text-white/50 flex-shrink-0">
                 📚 연습문제
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-sky-500/30 border border-sky-400/50 px-2 py-0.5 text-[10px] font-black text-sky-200 flex-shrink-0">
+                🌐 CMS
               </span>
             )}
           </div>

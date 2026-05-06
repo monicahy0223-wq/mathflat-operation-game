@@ -139,17 +139,27 @@ export async function fetchMultipleConcepts(
   settled.forEach((result, i) => {
     const concept = concepts[i];
     if (result.status === "rejected") {
-      console.warn(`[CMS] conceptId ${concept.id} 로드 실패 (rejected):`, result.reason);
+      console.warn(
+        `[CMS] conceptId=${concept.id} | 원본=0 | 필터통과=0 | fallback=true (rejected)`,
+        result.reason,
+      );
       failures.push(concept.id);
       return;
     }
 
     const value = result.value;
     if (value.errorCode) {
-      console.warn(`[CMS] conceptId ${concept.id} 로드 실패 (errorCode=${value.errorCode}):`, value.errorDetail ?? "");
+      console.warn(
+        `[CMS] conceptId=${concept.id} | 원본=${value.totalRaw} | 필터통과=0 | fallback=true (${value.errorCode}): ${value.errorDetail ?? ""}`,
+      );
       failures.push(concept.id);
       return;
     }
+
+    const filteredCount = value.questions.length;
+    console.log(
+      `[CMS] conceptId=${concept.id} | 원본=${value.totalRaw} | 필터통과=${filteredCount} | fallback=false`,
+    );
 
     questions.push(...value.questions);
   });

@@ -72,8 +72,12 @@ const MOCK_QUESTIONS: GameQuestion[] = [
 
 /**
  * Returns mock questions for the given conceptId (= stageId).
+ * Each question is tagged with isMock: true so callers can distinguish
+ * fallback data from real CMS content.
  * Called only when CMS questions are unavailable.
  */
 export function getQuestionsForStage(stageId: number): GameQuestion[] {
-  return MOCK_QUESTIONS.filter((q) => q.stageId === stageId);
+  return MOCK_QUESTIONS
+    .filter((q) => q.stageId === stageId)
+    .map((q) => ({ ...q, isMock: true as const }));
 }

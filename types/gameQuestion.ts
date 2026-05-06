@@ -40,4 +40,9 @@ export type GameQuestion = {
    *  undefined = mock 문제.
    */
   difficulty?:   number;
+  /**
+   * true = CMS 호출 실패 또는 필터 결과 0개로 인한 fallback mock 문제.
+   * CMS 문제에는 이 필드가 없거나 undefined.
+   */
+  isMock?:       boolean;
 };
