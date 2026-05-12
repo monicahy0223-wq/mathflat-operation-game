@@ -8,6 +8,14 @@ import type { CmsFetchResult, ConceptConfig } from "../lib/fetchMathflatProblems
 import { checkAnswerResult, getStarCount, normalizeAnswer } from "../lib/gameEngine";
 import { playSound } from "../lib/sounds";
 import type { SoundEffect } from "../lib/sounds";
+import { CharacterGuide, CharAvatar, HERO_IMG, DEFAULT_CHARACTER } from "./game/CharacterGuide";
+import type { CharState } from "./game/CharacterGuide";
+import { NumericKeypad, KEYPAD_THEME_STYLES } from "./game/NumericKeypad";
+import { FeedbackOverlay } from "./game/FeedbackOverlay";
+import { GrowArena, PuzzleArena, BattleArena, QuestionDisplay, ImageLoadFallback } from "./game/ArenaComponents";
+import type { BattleArenaInfo } from "./game/ArenaComponents";
+import { StatCard, StatsPanel, exportStats } from "./game/StatsPanel";
+import { TutorialModal } from "./game/TutorialModal";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 const TOTAL_TIME     = 60;
@@ -538,167 +546,6 @@ const LEVEL_LABEL: Record<QuestionLevel, { stars: string; color: string; label: 
   MEDIUM: { stars: "★★☆", color: "text-amber-400",   label: "보통" },
   HIGH:   { stars: "★★★", color: "text-rose-400",    label: "어려움" },
 };
-const DEFAULT_CHARACTER = "🧍";
-/** Image path used for the default (hero) character. */
-const HERO_IMG = "/assets/character/main.png";
-
-// ── Character guide system ──────────────────────────────────────────────────
-/** Visual state of the guide character. Each state can use a different asset. */
-type CharState = "idle" | "focus" | "success" | "oops";
-
-/**
- * Per-state image paths. If the asset is missing the component falls back to
- * HERO_IMG automatically via the onError handler.
- */
-const CHAR_IMGS: Record<CharState, string> = {
-  idle:    "/assets/character/main.png",
-  focus:   "/assets/character/focus.png",
-  success: "/assets/character/success.png",
-  oops:    "/assets/character/oops.png",
-};
-
-/**
- * Character guide widget — a small character image with a speech bubble.
- *
- * @param message    Text shown in the speech bubble.
- * @param charState  Controls which image is used and the animation applied.
- * @param size       Width/height of the character image in px.
- * @param bubbleSide Which side of the character the speech bubble sits on.
- * @param className  Extra classes applied to the outermost wrapper.
- */
-function CharacterGuide({
-  message,
-  charState = "idle",
-  size = 72,
-  bubbleSide = "right",
-  className = "",
-}: {
-  message:     string;
-  charState?:  CharState;
-  size?:       number;
-  bubbleSide?: "left" | "right";
-  className?:  string;
-}) {
-  const [imgSrc, setImgSrc] = useState(CHAR_IMGS[charState]);
-
-  useEffect(() => {
-    setImgSrc(CHAR_IMGS[charState]);
-  }, [charState]);
-
-  const handleImgError = () => setImgSrc(HERO_IMG);
-
-  const charEl = (
-    <div className="flex-shrink-0">
-      <img
-        src={imgSrc}
-        alt="캐릭터"
-        onError={handleImgError}
-        className={
-          charState === "success" || charState === "oops"
-            ? "animate-bounce"
-            : charState === "idle"
-            ? "animate-idle-float"
-            : ""
-        }
-        style={{
-          width:     size,
-          height:    size,
-          objectFit: "contain",
-          display:   "block",
-          filter:
-            charState === "success" ? "drop-shadow(0 0 10px rgba(16,185,129,0.6))" :
-            charState === "oops"    ? "drop-shadow(0 0 10px rgba(239,68,68,0.5))"  :
-            charState === "focus"   ? "drop-shadow(0 0 8px rgba(37,99,235,0.5))"   :
-                                     "drop-shadow(0 6px 14px rgba(0,0,0,0.15))",
-          animationDuration: charState === "idle" ? "2.8s" : "0.75s",
-          transition: "filter 0.3s",
-        }}
-      />
-    </div>
-  );
-
-  const bubbleEl = (
-    <div className="bubble-card relative" style={{ maxWidth: "300px" }}>
-      <div
-        className="rounded-2xl px-5 py-3.5 bg-white"
-        style={{
-          boxShadow: "0 8px 28px rgba(79,70,229,0.18), 0 2px 8px rgba(0,0,0,0.1)",
-          border:    "2px solid rgba(79,70,229,0.12)",
-        }}
-      >
-        <p className="ty-bubble text-slate-700" style={{ fontSize: "20px" }}>
-          {message}
-        </p>
-      </div>
-      {/* Tail pointing toward the character */}
-      {bubbleSide === "right" ? (
-        <div
-          className="absolute top-1/2 -translate-y-1/2"
-          style={{
-            left:         "-10px",
-            width:        0, height: 0,
-            borderTop:    "9px solid transparent",
-            borderBottom: "9px solid transparent",
-            borderRight:  "10px solid #fff",
-            filter:       "drop-shadow(-2px 0 2px rgba(79,70,229,0.1))",
-          }}
-        />
-      ) : (
-        <div
-          className="absolute top-1/2 -translate-y-1/2"
-          style={{
-            right:        "-10px",
-            width:        0, height: 0,
-            borderTop:    "9px solid transparent",
-            borderBottom: "9px solid transparent",
-            borderLeft:   "10px solid #fff",
-            filter:       "drop-shadow(2px 0 2px rgba(79,70,229,0.1))",
-          }}
-        />
-      )}
-    </div>
-  );
-
-  return (
-    <div className={`flex items-center gap-3 ${className}`}>
-      {bubbleSide === "right" ? <>{charEl}{bubbleEl}</> : <>{bubbleEl}{charEl}</>}
-    </div>
-  );
-}
-
-/**
- * Renders a character avatar: main.png for the default character,
- * emoji span for purchased skins (no separate image asset yet).
- */
-function CharAvatar({
-  src,
-  size = 56,
-  style: extraStyle,
-  className = "",
-}: {
-  src: string;
-  size?: number;
-  style?: React.CSSProperties;
-  className?: string;
-}) {
-  return (
-    <img
-      src={src}
-      alt="character"
-      width={size}
-      height={size}
-      style={{
-        objectFit: "contain",
-        display: "block",
-        ...extraStyle,
-      }}
-      className={className}
-      onError={(e) => {
-        e.currentTarget.style.display = "none";
-      }}
-    />
-  );
-}
 
 const SHOP_ITEMS = [
   { id: "rabbit", emoji: "🐰", name: "토끼 모험가",   price: 30, desc: "빠르고 귀여워요!" },
@@ -886,28 +733,6 @@ function writeSave(data: SaveData): void {
 // ─── tutorial ─────────────────────────────────────────────────────────────────
 const TUTORIAL_KEY = "mathGameTutorialSeen";
 
-const TUTORIAL_STEPS = [
-  {
-    icon:  "⚔️",
-    title: "문제를 풀어 공격하기",
-    desc:  "수학 문제의 정답을 입력하면\n몬스터를 공격할 수 있어요!\n5번 맞히면 스테이지 클리어!",
-  },
-  {
-    icon:  "💰",
-    title: "코인과 콤보",
-    desc:  "연속으로 맞히면 콤보가 올라가고\n더 많은 코인을 얻을 수 있어요!\n콤보를 끊지 말고 도전해봐요.",
-  },
-  {
-    icon:  "🗺️",
-    title: "스테이지 클리어",
-    desc:  "스테이지를 클리어하면\n다음 맵이 열려요!\n모든 퀘스트를 완료해보세요.",
-  },
-  {
-    icon:  "🏪",
-    title: "상점에서 캐릭터 구매",
-    desc:  "모은 코인으로 상점에서\n귀여운 캐릭터 스킨을\n구매할 수 있어요!",
-  },
-] as const;
 
 function loadTutorialSeen(): boolean {
   if (typeof window === "undefined") return false;
@@ -962,16 +787,21 @@ function saveRanking(data: RankData): void {
   try { localStorage.setItem(rankKey(_currentStudentId), JSON.stringify(data)); } catch { /* ignore */ }
 }
 
-// ─── lifetime learning stats ──────────────────────────────────────────────────
+// ─── 누적 학습 통계 ──────────────────────────────────────────────────
 
 /**
- * Persisted learning stats.
- * `streakDays` and `lastCompletedDate` form the completion-based streak:
- *   they are updated only when the player meets today's daily goal
- *   (5 correct answers OR 1 stage clear), not just by opening the app.
- * This same `streakDays` value is shown in both the WorldMap streak banner
- * and the StatsPanel "연속 학습일" row — there is one source of truth.
+ * 저장되는 학습 통계 데이터입니다.
+ * `streakDays`와 `lastCompletedDate`는 완료 기반 연속 학습 기록을 구성합니다.
+ *   단순히 앱을 실행했을 때가 아니라,
+ *   플레이어가 오늘의 일일 목표를 달성했을 때만 갱신됩니다.
+ *   (정답 5개 달성 또는 스테이지 1개 클리어)
+ *
+ * 동일한 `streakDays` 값이
+ * WorldMap의 연속 학습 배너와
+ * StatsPanel의 "연속 학습일" 항목에 함께 사용됩니다.
+ * 즉, 하나의 값을 기준으로 공유합니다.
  */
+
 type LifetimeStats = {
   totalSolved:        number; // all problems attempted
   totalCorrect:       number; // correct answers
@@ -1152,256 +982,19 @@ type WrongQuestion = Pick<GameQuestion, "id" | "text" | "answer" | "conceptName"
 type Phase    = "modeSelect" | "ready" | "regionMap" | "shop" | "travel" | "playing" | "stageClear" | "result" | "review" | "reviewClear" | "difficultySelect" | "teacherDashboard";
 type CardAnim = "bounce" | "shake" | "";
 
-// ─── NumericKeypad ────────────────────────────────────────────────────────────
-
-type KeypadTheme = GameMode | "review";
-
-/** 향후 확장용 추가 키 (예: ".", "/") */
-type ExtraKey = { label: string; onPress: () => void };
-
-interface NumericKeypadProps {
-  onDigit:     (d: string) => void;
-  onBackspace: () => void;
-  onConfirm:   () => void;
-  theme?:      KeypadTheme;
-  disabled?:   boolean;
-  /** 향후 "." · "/" 같은 추가 키를 삽입할 슬롯 (⌫ 왼쪽 자리에 표시) */
-  extraKeys?:  ExtraKey[];
-}
-
-const KEYPAD_THEME_STYLES: Record<KeypadTheme, {
-  wrap:        React.CSSProperties;
-  digit:       React.CSSProperties;
-  digitHover:  React.CSSProperties;
-  backspace:   React.CSSProperties;
-  confirm:     React.CSSProperties;
-  display:     React.CSSProperties;
-  glow:        string;
-}> = {
-  grow: {
-    wrap:       { background: "linear-gradient(160deg,#052e16 0%,#064e3b 80%)", borderRadius: "20px", padding: "12px", border: "1.5px solid rgba(16,185,129,0.35)", boxShadow: "0 8px 32px rgba(16,185,129,0.18)" },
-    digit:      { background: "linear-gradient(135deg,#d1fae5 0%,#a7f3d0 100%)", color: "#064e3b", border: "1.5px solid rgba(16,185,129,0.25)", borderRadius: "14px", fontWeight: 900, fontSize: "clamp(1.35rem,5vw,1.75rem)", boxShadow: "0 3px 8px rgba(16,185,129,0.18), inset 0 1px 0 rgba(255,255,255,0.6)" },
-    digitHover: { background: "linear-gradient(135deg,#a7f3d0 0%,#6ee7b7 100%)", boxShadow: "0 4px 16px rgba(16,185,129,0.40), inset 0 1px 0 rgba(255,255,255,0.5)" },
-    backspace:  { background: "linear-gradient(135deg,#fef3c7 0%,#fde68a 100%)", color: "#78350f", border: "1.5px solid rgba(245,158,11,0.35)", borderRadius: "14px", fontWeight: 900, boxShadow: "0 3px 8px rgba(245,158,11,0.18)" },
-    confirm:    { background: "linear-gradient(135deg,#059669 0%,#047857 100%)", color: "#fff", border: "none", borderRadius: "14px", fontWeight: 900, fontSize: "clamp(1rem,4vw,1.2rem)", boxShadow: "0 4px 16px rgba(5,150,105,0.45)" },
-    display:    { background: "rgba(5,46,22,0.7)", border: "2px solid rgba(16,185,129,0.4)", color: "#d1fae5", caretColor: "#6ee7b7", borderRadius: "14px" },
-    glow:       "rgba(16,185,129,0.55)",
-  },
-  battle: {
-    wrap:       { background: "linear-gradient(160deg,#1c0700 0%,#450a0a 80%)", borderRadius: "20px", padding: "12px", border: "1.5px solid rgba(239,68,68,0.45)", boxShadow: "0 8px 32px rgba(239,68,68,0.22)" },
-    digit:      { background: "linear-gradient(135deg,#292524 0%,#3f3f46 100%)", color: "#fca5a5", border: "1.5px solid rgba(239,68,68,0.3)", borderRadius: "14px", fontWeight: 900, fontSize: "clamp(1.35rem,5vw,1.75rem)", boxShadow: "0 3px 8px rgba(239,68,68,0.20), inset 0 1px 0 rgba(255,255,255,0.08)" },
-    digitHover: { background: "linear-gradient(135deg,#57534e 0%,#78716c 100%)", boxShadow: "0 4px 16px rgba(239,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.1)" },
-    backspace:  { background: "linear-gradient(135deg,#292524 0%,#3f3f46 100%)", color: "#fbbf24", border: "1.5px solid rgba(245,158,11,0.35)", borderRadius: "14px", fontWeight: 900, boxShadow: "0 3px 8px rgba(245,158,11,0.18)" },
-    confirm:    { background: "linear-gradient(135deg,#dc2626 0%,#b91c1c 100%)", color: "#fff", border: "none", borderRadius: "14px", fontWeight: 900, fontSize: "clamp(1rem,4vw,1.2rem)", boxShadow: "0 4px 16px rgba(220,38,38,0.55)" },
-    display:    { background: "rgba(28,7,0,0.8)", border: "2px solid rgba(239,68,68,0.45)", color: "#fca5a5", caretColor: "#f87171", borderRadius: "14px" },
-    glow:       "rgba(239,68,68,0.65)",
-  },
-  puzzle: {
-    wrap:       { background: "linear-gradient(160deg,#1e1b4b 0%,#312e81 80%)", borderRadius: "20px", padding: "12px", border: "1.5px solid rgba(99,102,241,0.45)", boxShadow: "0 8px 32px rgba(99,102,241,0.22)" },
-    digit:      { background: "linear-gradient(135deg,#1e1b4b 0%,#2e1065 100%)", color: "#c4b5fd", border: "1.5px solid rgba(139,92,246,0.35)", borderRadius: "14px", fontWeight: 900, fontSize: "clamp(1.35rem,5vw,1.75rem)", boxShadow: "0 3px 8px rgba(99,102,241,0.22), inset 0 1px 0 rgba(255,255,255,0.08)" },
-    digitHover: { background: "linear-gradient(135deg,#312e81 0%,#4c1d95 100%)", boxShadow: "0 4px 16px rgba(139,92,246,0.55), inset 0 1px 0 rgba(255,255,255,0.1)" },
-    backspace:  { background: "linear-gradient(135deg,#1e1b4b 0%,#2e1065 100%)", color: "#fbbf24", border: "1.5px solid rgba(245,158,11,0.35)", borderRadius: "14px", fontWeight: 900, boxShadow: "0 3px 8px rgba(245,158,11,0.18)" },
-    confirm:    { background: "linear-gradient(135deg,#7c3aed 0%,#6d28d9 100%)", color: "#fff", border: "none", borderRadius: "14px", fontWeight: 900, fontSize: "clamp(1rem,4vw,1.2rem)", boxShadow: "0 4px 16px rgba(109,40,217,0.55)" },
-    display:    { background: "rgba(15,10,40,0.8)", border: "2px solid rgba(139,92,246,0.45)", color: "#ede9fe", caretColor: "#a78bfa", borderRadius: "14px" },
-    glow:       "rgba(139,92,246,0.65)",
-  },
-  review: {
-    wrap:       { background: "linear-gradient(160deg,#1e1b4b 0%,#2e1065 80%)", borderRadius: "20px", padding: "12px", border: "1.5px solid rgba(139,92,246,0.45)", boxShadow: "0 8px 32px rgba(139,92,246,0.20)" },
-    digit:      { background: "linear-gradient(135deg,#1e1b4b 0%,#2e1065 100%)", color: "#ddd6fe", border: "1.5px solid rgba(139,92,246,0.30)", borderRadius: "14px", fontWeight: 900, fontSize: "clamp(1.35rem,5vw,1.75rem)", boxShadow: "0 3px 8px rgba(139,92,246,0.18), inset 0 1px 0 rgba(255,255,255,0.06)" },
-    digitHover: { background: "linear-gradient(135deg,#312e81 0%,#4c1d95 100%)", boxShadow: "0 4px 16px rgba(139,92,246,0.50), inset 0 1px 0 rgba(255,255,255,0.08)" },
-    backspace:  { background: "linear-gradient(135deg,#1e1b4b 0%,#2e1065 100%)", color: "#fbbf24", border: "1.5px solid rgba(245,158,11,0.35)", borderRadius: "14px", fontWeight: 900, boxShadow: "0 3px 8px rgba(245,158,11,0.15)" },
-    confirm:    { background: "linear-gradient(135deg,#7c3aed 0%,#5b21b6 100%)", color: "#fff", border: "none", borderRadius: "14px", fontWeight: 900, fontSize: "clamp(1rem,4vw,1.2rem)", boxShadow: "0 4px 16px rgba(109,40,217,0.50)" },
-    display:    { background: "rgba(15,10,40,0.75)", border: "2px solid rgba(139,92,246,0.40)", color: "#ede9fe", caretColor: "#a78bfa", borderRadius: "14px" },
-    glow:       "rgba(139,92,246,0.60)",
-  },
-};
-
-function NumericKeypad({
-  onDigit,
-  onBackspace,
-  onConfirm,
-  theme    = "battle",
-  disabled = false,
-  extraKeys = [],
-}: NumericKeypadProps) {
-  const s = KEYPAD_THEME_STYLES[theme];
-  const [pressedKey, setPressedKey] = useState<string | null>(null);
-
-  const handlePress = (key: string, action: () => void) => {
-    if (disabled) return;
-    setPressedKey(key);
-    action();
-    setTimeout(() => setPressedKey(null), 120);
-  };
-
-  const KEY_ROWS = [
-    ["7", "8", "9"],
-    ["4", "5", "6"],
-    ["1", "2", "3"],
-  ];
-
-  return (
-    <div style={{ ...s.wrap, display: "flex", flexDirection: "column", gap: "8px", userSelect: "none" }}>
-      {KEY_ROWS.map((row) => (
-        <div key={row.join("")} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
-          {row.map((d) => {
-            const isPressed = pressedKey === d;
-            return (
-              <button
-                key={d}
-                type="button"
-                disabled={disabled}
-                onClick={() => handlePress(d, () => onDigit(d))}
-                style={{
-                  ...s.digit,
-                  ...(isPressed ? s.digitHover : {}),
-                  transform: isPressed ? "scale(0.92)" : "scale(1)",
-                  transition: "transform 0.10s ease, box-shadow 0.12s ease, background 0.12s ease",
-                  cursor: disabled ? "not-allowed" : "pointer",
-                  opacity: disabled ? 0.5 : 1,
-                  minHeight: "clamp(44px,11vw,56px)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: s.digit.border,
-                  WebkitTapHighlightColor: "transparent",
-                }}
-              >
-                {d}
-              </button>
-            );
-          })}
-        </div>
-      ))}
-
-      {/* Bottom row: [extra/⌫] [0] [확인] */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
-        {/* ⌫ or first extraKey */}
-        {extraKeys.length > 0 ? (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => handlePress("extra0", extraKeys[0].onPress)}
-            style={{
-              ...s.backspace,
-              transform: pressedKey === "extra0" ? "scale(0.92)" : "scale(1)",
-              transition: "transform 0.10s ease, box-shadow 0.12s ease",
-              cursor: disabled ? "not-allowed" : "pointer",
-              opacity: disabled ? 0.5 : 1,
-              minHeight: "clamp(44px,11vw,56px)",
-              fontSize: "clamp(1rem,4vw,1.25rem)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              WebkitTapHighlightColor: "transparent",
-            }}
-          >
-            {extraKeys[0].label}
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => handlePress("⌫", onBackspace)}
-            style={{
-              ...s.backspace,
-              transform: pressedKey === "⌫" ? "scale(0.92)" : "scale(1)",
-              transition: "transform 0.10s ease, box-shadow 0.12s ease",
-              cursor: disabled ? "not-allowed" : "pointer",
-              opacity: disabled ? 0.5 : 1,
-              minHeight: "clamp(44px,11vw,56px)",
-              fontSize: "clamp(1.1rem,4.5vw,1.4rem)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              WebkitTapHighlightColor: "transparent",
-            }}
-          >
-            ⌫
-          </button>
-        )}
-
-        {/* 0 */}
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => handlePress("0", () => onDigit("0"))}
-          style={{
-            ...s.digit,
-            ...(pressedKey === "0" ? s.digitHover : {}),
-            transform: pressedKey === "0" ? "scale(0.92)" : "scale(1)",
-            transition: "transform 0.10s ease, box-shadow 0.12s ease, background 0.12s ease",
-            cursor: disabled ? "not-allowed" : "pointer",
-            opacity: disabled ? 0.5 : 1,
-            minHeight: "clamp(44px,11vw,56px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            WebkitTapHighlightColor: "transparent",
-          }}
-        >
-          0
-        </button>
-
-        {/* 확인 */}
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => handlePress("✓", onConfirm)}
-          style={{
-            ...s.confirm,
-            transform: pressedKey === "✓" ? "scale(0.92)" : "scale(1)",
-            transition: "transform 0.10s ease, box-shadow 0.12s ease",
-            cursor: disabled ? "not-allowed" : "pointer",
-            opacity: disabled ? 0.5 : 1,
-            minHeight: "clamp(44px,11vw,56px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            WebkitTapHighlightColor: "transparent",
-          }}
-        >
-          확인
-        </button>
-      </div>
-
-      {/* extra keys row (2nd+ extra key), hidden until used */}
-      {extraKeys.length > 1 && (
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${extraKeys.length - 1}, 1fr)`, gap: "8px" }}>
-          {extraKeys.slice(1).map((ek, i) => {
-            const keyId = `extra${i + 1}`;
-            return (
-              <button
-                key={keyId}
-                type="button"
-                disabled={disabled}
-                onClick={() => handlePress(keyId, ek.onPress)}
-                style={{
-                  ...s.backspace,
-                  transform: pressedKey === keyId ? "scale(0.92)" : "scale(1)",
-                  transition: "transform 0.10s ease",
-                  cursor: disabled ? "not-allowed" : "pointer",
-                  opacity: disabled ? 0.5 : 1,
-                  minHeight: "clamp(44px,11vw,56px)",
-                  fontSize: "clamp(1rem,4vw,1.25rem)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  WebkitTapHighlightColor: "transparent",
-                }}
-              >
-                {ek.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── component ────────────────────────────────────────────────────────────────
-export default function MathGame() {
+export default function MathGame({
+  studentMode = false,
+  onExit,
+  onTeacherMenu,
+  initialStudentId,
+}: {
+  studentMode?: boolean;
+  onExit?: () => void;
+  onTeacherMenu?: () => void;
+  initialStudentId?: string;
+} = {}) {
   // ── progress state (persists across stages on the same run) ────────────────
   const [unlockedTypeId,  setUnlockedTypeId]  = useState(FIRST_TYPE_ID);
   const [clearedTypeIds,  setClearedTypeIds]  = useState<number[]>([]);
@@ -1696,12 +1289,16 @@ export default function MathGame() {
   useEffect(() => {
     // Load student list first and set module-level ID before any data loads
     const { students, selectedId } = loadStudentList();
+    // If teacher passed a specific student to view, use that; otherwise use saved selection
+    const effectiveId = (initialStudentId && students.some((s) => s.id === initialStudentId))
+      ? initialStudentId
+      : selectedId;
     setStudentList(students);
-    setSelectedStudentId(selectedId);
-    _currentStudentId = selectedId; // keep module var in sync
+    setSelectedStudentId(effectiveId);
+    _currentStudentId = effectiveId; // keep module var in sync
 
-    const save  = loadSave(selectedId);
-    const daily = loadDaily(selectedId);
+    const save  = loadSave(effectiveId);
+    const daily = loadDaily(effectiveId);
     setCoins(save.coins);
     setUnlockedTypeId(save.unlockedTypeId);
     setClearedTypeIds(save.clearedTypeIds);
@@ -1719,10 +1316,10 @@ export default function MathGame() {
     setStagesClearedToday(daily.stagesClearedToday);
     setMissionsBonusClaimed(daily.missionsBonusClaimed);
     if (!loadTutorialSeen()) setShowTutorial(true);
-    const rawStats = loadLifetimeStats(selectedId);
+    const rawStats = loadLifetimeStats(effectiveId);
     lifetimeStatsRef.current = rawStats;
     setLifetimeStats(rawStats);
-    const rank = loadRanking(selectedId);
+    const rank = loadRanking(effectiveId);
     setBestScore(rank.bestScore);
     setRecentScores(rank.recentScores);
     const se = loadSoundEnabled();
@@ -2687,32 +2284,74 @@ export default function MathGame() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {/* 교사용 버튼 — userRole에 따라 조건 노출 */}
-            {userRole === "teacher" && (
+            {onTeacherMenu ? (
+              /* 교사가 게임을 보는 중: 관리 메뉴 열기 버튼 — 크고 잘 보이게 */
               <button
-                onClick={goToTeacherDashboard}
-                className="rounded-xl px-3 py-1.5 font-black text-xs text-white transition-all active:scale-90"
-                style={{ background: "linear-gradient(135deg,#7c3aed,#6d28d9)", boxShadow: "0 2px 8px rgba(109,40,217,0.35)" }}
-                title="교사 대시보드"
+                onClick={onTeacherMenu}
+                className="rounded-2xl px-5 py-2.5 font-black text-sm text-white transition-all active:scale-90 flex items-center gap-2"
+                style={{
+                  background: "linear-gradient(135deg,#7c3aed,#6d28d9)",
+                  boxShadow: "0 4px 16px rgba(109,40,217,0.5)",
+                  letterSpacing: "-0.01em",
+                }}
+                title="교사 관리 메뉴"
               >
-                👩‍🏫 교사용
+                <span style={{ fontSize: "16px" }}>👩‍🏫</span>
+                <span>Settings</span>
               </button>
+            ) : studentMode ? (
+              onExit && (
+                <button
+                  onClick={onExit}
+                  className="rounded-xl px-2.5 py-1.5 text-[11px] font-bold transition-all active:scale-90"
+                  style={{ background: "rgba(0,0,0,0.06)", color: "#64748b" }}
+                  title="처음 화면으로"
+                >
+                  ← 처음으로
+                </button>
+              )
+            ) : (
+              <>
+                {/* 교사용 버튼 — userRole에 따라 조건 노출 */}
+                {userRole === "teacher" && (
+                  <button
+                    onClick={goToTeacherDashboard}
+                    className="rounded-xl px-3 py-1.5 font-black text-xs text-white transition-all active:scale-90"
+                    style={{ background: "linear-gradient(135deg,#7c3aed,#6d28d9)", boxShadow: "0 2px 8px rgba(109,40,217,0.35)" }}
+                    title="교사 대시보드"
+                  >
+                    👩‍🏫 교사용
+                  </button>
+                )}
+                {/* role 전환 버튼 (작게) */}
+                <button
+                  onClick={toggleUserRole}
+                  className="rounded-xl px-2.5 py-1.5 text-[10px] font-bold transition-all active:scale-90"
+                  style={{ background: "rgba(0,0,0,0.06)", color: "#64748b" }}
+                  title={userRole === "teacher" ? "학생 모드로 전환" : "교사 모드로 전환"}
+                >
+                  {userRole === "teacher" ? "학생용" : "교사용"}
+                </button>
+              </>
             )}
-            {/* role 전환 버튼 (작게) */}
-            <button
-              onClick={toggleUserRole}
-              className="rounded-xl px-2.5 py-1.5 text-[10px] font-bold transition-all active:scale-90"
-              style={{ background: "rgba(0,0,0,0.06)", color: "#64748b" }}
-              title={userRole === "teacher" ? "학생 모드로 전환" : "교사 모드로 전환"}
-            >
-              {userRole === "teacher" ? "학생용" : "교사용"}
-            </button>
-            <div className="flex items-center gap-1.5 rounded-2xl px-4 py-2 bg-amber-50">
-              <span className="text-lg leading-none">💰</span>
-              <span className="font-black text-amber-700" style={{ fontSize: "clamp(15px,4vw,19px)" }}>
-                {coins}
-              </span>
-            </div>
+            {!onTeacherMenu && (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 rounded-2xl px-4 py-2 bg-amber-50">
+                  <span className="text-lg leading-none">💰</span>
+                  <span className="font-black text-amber-700" style={{ fontSize: "clamp(15px,4vw,19px)" }}>
+                    {coins}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setPhase("shop")}
+                  className="rounded-2xl px-4 py-2 font-black text-sm text-white transition-all active:scale-90"
+                  style={{ background: "linear-gradient(135deg,#f59e0b,#f97316)", boxShadow: "0 2px 8px rgba(245,158,11,0.35)" }}
+                  title="상점"
+                >
+                  🛒
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -2740,7 +2379,9 @@ export default function MathGame() {
               style={{ boxShadow: "0 8px 28px rgba(79,70,229,0.18), 0 2px 8px rgba(0,0,0,0.1)" }}
             >
               <p className="font-bold text-slate-700" style={{ fontSize: "clamp(14px,3.8vw,17px)" }}>
-                {selectedStudentName} 학생, 어떤 지역으로 모험을 떠날까요? 🗺️
+                {onTeacherMenu
+                  ? "안녕하세요, 선생님! 천천히 둘러보세요 👩‍🏫"
+                  : `${selectedStudentName} 학생, 어떤 지역으로 모험을 떠날까요? 🗺️`}
               </p>
             </div>
             <div
@@ -2915,35 +2556,39 @@ export default function MathGame() {
           </div>
 
           {/* 스크롤 힌트 점 */}
-          <div className="flex items-center justify-center gap-1.5 pb-2">
-            {MODE_CARDS.map((m, i) => (
-              <div
-                key={m.id}
-                style={{
-                  width:     i === 1 ? "20px" : "6px",
-                  height:    "6px",
-                  borderRadius: "9999px",
-                  background: i === 1 ? "#2563eb" : "#cbd5e1",
-                  transition: "all 0.2s",
-                }}
-              />
-            ))}
-          </div>
+          {MODE_CARDS.length >3 && (
+            <div className="flex items-center justify-center gap-1.5 pb-2">
+              {MODE_CARDS.map((m, i) => (
+                <div
+                  key={m.id}
+                  style={{
+                    width:     i === 1 ? "20px" : "6px",
+                    height:    "6px",
+                    borderRadius: "9999px",
+                    background: i === 1 ? "#2563eb" : "#cbd5e1",
+                    transition: "all 0.2s",
+                  }}
+                />
+              ))}
+            </div>)
+          }
         </div>
 
-        {/* ── 하단 요약 ── */}
-        <div
-          className="w-full mx-auto flex-shrink-0 flex items-center justify-center gap-3 pb-6 pt-1"
-          style={{ maxWidth: "900px" }}
-        >
-          <span className="text-xs font-medium text-slate-400">💰 {coins}</span>
-          {wrongQuestions.length > 0 && (
-            <span className="text-xs font-medium text-slate-400">· 📝 오답 {wrongQuestions.length}</span>
-          )}
-          {lifetimeStats.streakDays > 0 && (
-            <span className="text-xs font-medium text-slate-400">· 🔥 {lifetimeStats.streakDays}일</span>
-          )}
-        </div>
+        {/* ── 하단 요약 (교사 모드에서는 숨김) ── */}
+        {!onTeacherMenu && (
+          <div
+            className="w-full mx-auto flex-shrink-0 flex items-center justify-center gap-3 pb-6 pt-1"
+            style={{ maxWidth: "900px" }}
+          >
+            <span className="text-xs font-medium text-slate-400">💰 {coins}</span>
+            {wrongQuestions.length > 0 && (
+              <span className="text-xs font-medium text-slate-400">· 📝 오답 {wrongQuestions.length}</span>
+            )}
+            {lifetimeStats.streakDays > 0 && (
+              <span className="text-xs font-medium text-slate-400">· 🔥 {lifetimeStats.streakDays}일</span>
+            )}
+          </div>
+        )}
       </main>
     );
   }
@@ -2985,7 +2630,8 @@ export default function MathGame() {
                 <span className="text-sm">🏆</span>
                 <span className="font-black text-amber-300 text-sm">{bestScore}</span>
               </div>
-              <button onClick={goToShop} className="rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 px-3 py-1.5 font-bold text-sm text-white/80 transition-all">
+              <button onClick={goToShop} className="rounded-2xl px-3 py-1.5 font-bold text-sm text-white active:scale-95 transition-all"
+                style={{ background: "linear-gradient(135deg,#f59e0b,#f97316)", boxShadow: "0 2px 8px rgba(245,158,11,0.3)" }}>
                 🛒
               </button>
             </div>
@@ -3139,7 +2785,8 @@ export default function MathGame() {
                 : <span className="text-xs font-bold text-emerald-700 bg-white/60 rounded-full px-2.5 py-1">✓ {cmsPool.length}문제</span>
               }
               <button onClick={goToShop}
-                className="rounded-xl bg-white/70 hover:bg-white/90 active:scale-95 px-3 py-1.5 font-bold text-sm text-slate-600 transition-all backdrop-blur-sm">
+                className="rounded-xl px-3 py-1.5 font-bold text-sm text-white active:scale-95 transition-all"
+                style={{ background: "linear-gradient(135deg,#f59e0b,#f97316)", boxShadow: "0 2px 8px rgba(245,158,11,0.3)" }}>
                 🛒
               </button>
             </div>
@@ -3291,7 +2938,15 @@ export default function MathGame() {
     };
 
     return (
-      <main className="min-h-screen bg-gradient-to-b from-violet-400 via-purple-400 to-indigo-500 flex flex-col items-center p-5 pt-8">
+      <main className="min-h-screen bg-gradient-to-b from-violet-400 via-purple-400 to-indigo-500 flex flex-col items-center p-5 pt-8 relative">
+        {/* 맵으로 돌아가기 — 우측 상단 고정 */}
+        <button
+          onClick={goToMap}
+          className="absolute top-4 right-4 rounded-xl px-3 py-1.5 text-xs font-bold text-white transition-all active:scale-90 flex items-center gap-1"
+          style={{ background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.3)", backdropFilter: "blur(8px)" }}
+        >
+          🗺️ 맵으로
+        </button>
         {/* Header */}
         <div className="text-center mb-6">
           <div className="text-5xl mb-2 select-none">🏪</div>
@@ -3451,13 +3106,6 @@ export default function MathGame() {
             </div>
           </div>
 
-          {/* Back to map */}
-          <button
-            onClick={goToMap}
-            className="w-full rounded-2xl border-2 border-white/30 bg-white/20 hover:bg-white/30 active:scale-95 text-white p-3 font-bold text-sm transition-all mt-2"
-          >
-            🗺️ 맵으로 돌아가기
-          </button>
         </div>
       </main>
     );
@@ -5322,6 +4970,8 @@ export default function MathGame() {
   );
 }
 
+const PUZZLE_CELL_EMOJIS = ["🔮", "🎯", "⚡", "🌊", "🍀", "💎", "🌟", "🎪", "🏆"];
+
 // ─── WorldMap ─────────────────────────────────────────────────────────────────
 function WorldMap({
   unlockedTypeId,
@@ -6055,987 +5705,15 @@ function WorldMap({
   );
 }
 
-// ─── BattleArena ──────────────────────────────────────────────────────────────
-type TypeInfo = (typeof FLAT_TYPES)[number];
 
-/** Shared props for all arena visualizations. */
-type ArenaVisualizationProps = {
-  correctCount:   number;
-  monsterHp:      number;
-  charAttacking:  boolean;
-  monsterHit:     boolean;
-  monsterCounter: boolean;
-  damageKey:      number;
-  combo:          number;
-  character:      string;
-  // grow mode extras
-  growExp?:   number;
-  growLevel?: number;
-};
 
-// ─── GrowArena ────────────────────────────────────────────────────────────────
-const GROW_STAGES = ["🌱", "🌿", "🪴", "🌳", "🌸", "🌺"];
 
-function GrowArena({ correctCount, monsterHit, monsterCounter, combo, character, growExp = 0, growLevel = 1 }: ArenaVisualizationProps) {
-  const stage      = Math.min(correctCount, GROW_STAGES.length - 1);
-  const plantEmoji = GROW_STAGES[stage];
-  const stagePct   = (correctCount / MONSTER_MAX_HP) * 100;
-  const expPct     = Math.min((growExp / EXP_PER_LEVEL) * 100, 100);
 
-  return (
-    <div
-      className="rounded-3xl overflow-hidden select-none"
-      style={{
-        background: "linear-gradient(180deg,#bae6fd 0%,#bbf7d0 55%,#86efac 100%)",
-        minHeight: 180,
-        boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
-        border: "2px solid rgba(255,255,255,0.5)",
-      }}
-    >
-      {/* Top bar: level badge + combo */}
-      <div className="flex items-center justify-between px-4 pt-3 pb-1">
-        <div
-          className="flex items-center gap-1.5 rounded-full px-2.5 py-0.5"
-          style={{ background: "rgba(16,185,129,0.18)", border: "1.5px solid #10b981" }}
-        >
-          <span style={{ fontSize: 12 }}>⭐</span>
-          <span className="font-black text-emerald-800" style={{ fontSize: 11 }}>Lv.{growLevel}</span>
-        </div>
-        <div className="text-xs font-black text-emerald-600">
-          {combo >= 3 ? `🔥 ×${combo} 콤보!` : combo >= 2 ? "✌️ Good!" : ""}
-        </div>
-      </div>
 
-      {/* Main area */}
-      <div className="flex items-end justify-around px-6 pb-2 pt-1 gap-4">
-        {/* Character (left) */}
-        <div
-          className={`flex-shrink-0 transition-transform ${monsterHit ? "scale-125" : "scale-100"}`}
-          style={{ fontSize: 44 }}
-        >
-          {character.startsWith("/") ? (
-            <img src={character} alt="character" style={{ width: 48, height: 48, objectFit: "contain" }} />
-          ) : (
-            <span>{character}</span>
-          )}
-        </div>
 
-        {/* Central plant */}
-        <div
-          className={`text-7xl transition-transform duration-300 ${
-            monsterCounter ? "animate-shake" : monsterHit ? "scale-125" : "scale-100"
-          }`}
-          style={{ filter: monsterHit ? "drop-shadow(0 0 20px rgba(34,197,94,0.9))" : "none" }}
-        >
-          {plantEmoji}
-        </div>
 
-        {/* Stage progress petals (right) */}
-        <div className="flex-shrink-0 flex flex-col gap-0.5 items-center">
-          {Array.from({ length: MONSTER_MAX_HP }).map((_, i) => (
-            <span key={i} className={`text-sm ${i < correctCount ? "animate-pop-in" : "opacity-20"}`}>🌸</span>
-          ))}
-        </div>
-      </div>
 
-      {/* EXP bar */}
-      <div className="mx-4 mb-1.5">
-        <div className="flex justify-between text-[10px] font-black text-emerald-800 mb-0.5 opacity-80">
-          <span>✨ 경험치</span>
-          <span>{growExp} / {EXP_PER_LEVEL}</span>
-        </div>
-        <div className="rounded-full overflow-hidden h-3.5" style={{ background: "rgba(0,0,0,0.13)" }}>
-          <div
-            className="h-full rounded-full transition-all duration-600"
-            style={{
-              width: `${expPct}%`,
-              background: "linear-gradient(90deg,#34d399,#10b981,#059669)",
-              boxShadow: "0 0 10px rgba(16,185,129,0.7)",
-            }}
-          />
-        </div>
-      </div>
 
-      {/* Stage progress bar */}
-      <div className="mx-4 mb-3">
-        <div className="flex justify-between text-[10px] font-black text-emerald-700 mb-0.5 opacity-70">
-          <span>🌱 스테이지 진행</span>
-          <span>{correctCount} / {MONSTER_MAX_HP}</span>
-        </div>
-        <div className="rounded-full overflow-hidden h-2" style={{ background: "rgba(0,0,0,0.10)" }}>
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${stagePct}%`,
-              background: "linear-gradient(90deg,#86efac,#4ade80)",
-            }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── PuzzleArena ──────────────────────────────────────────────────────────────
-// 3×3 board (9 cells) mapped from MONSTER_MAX_HP (5) correct answers.
-const PUZZLE_TOTAL = 9;
-const PUZZLE_CELL_COLORS = [
-  "linear-gradient(135deg,#a855f7,#7c3aed)",
-  "linear-gradient(135deg,#ec4899,#db2777)",
-  "linear-gradient(135deg,#f59e0b,#d97706)",
-  "linear-gradient(135deg,#06b6d4,#0284c7)",
-  "linear-gradient(135deg,#22c55e,#16a34a)",
-  "linear-gradient(135deg,#f43f5e,#e11d48)",
-  "linear-gradient(135deg,#6366f1,#4f46e5)",
-  "linear-gradient(135deg,#fb923c,#ea580c)",
-  "linear-gradient(135deg,#34d399,#059669)",
-];
-const PUZZLE_CELL_EMOJIS = ["🔮", "🎯", "⚡", "🌊", "🍀", "💎", "🌟", "🎪", "🏆"];
-
-function PuzzleArena({ correctCount, monsterCounter, monsterHit, combo }: ArenaVisualizationProps) {
-  // Map 0-MONSTER_MAX_HP to 0-PUZZLE_TOTAL cells filled
-  const filledCells = Math.round((correctCount / MONSTER_MAX_HP) * PUZZLE_TOTAL);
-  const puzzlePct   = (correctCount / MONSTER_MAX_HP) * 100;
-
-  return (
-    <div
-      className="rounded-3xl overflow-hidden select-none"
-      style={{
-        background: "linear-gradient(180deg,#0f0c29 0%,#1e1b4b 55%,#312e81 100%)",
-        minHeight: 195,
-        boxShadow: "0 8px 32px rgba(0,0,0,0.22)",
-        border: "2px solid rgba(139,92,246,0.22)",
-      }}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-3 pb-1">
-        <div
-          className="flex items-center gap-1.5 rounded-full px-2.5 py-0.5"
-          style={{ background: "rgba(139,92,246,0.2)", border: "1.5px solid rgba(139,92,246,0.45)" }}
-        >
-          <span style={{ fontSize: 11 }}>🧩</span>
-          <span className="font-black text-violet-300" style={{ fontSize: 11 }}>퍼즐 {filledCells} / {PUZZLE_TOTAL}</span>
-        </div>
-        <div className="text-xs font-black text-violet-300">
-          {combo >= 3 ? `🔥 ×${combo} 콤보!` : combo >= 2 ? "✌️ Great!" : ""}
-        </div>
-      </div>
-
-      {/* 3×3 Puzzle grid */}
-      <div
-        className={`grid grid-cols-3 gap-2 px-4 py-2 ${monsterCounter ? "animate-shake" : ""}`}
-      >
-        {Array.from({ length: PUZZLE_TOTAL }, (_, i) => {
-          const revealed = i < filledCells;
-          const isNew    = revealed && i === filledCells - 1 && monsterHit;
-          return (
-            <div
-              key={i}
-              className={`rounded-2xl flex items-center justify-center ${
-                isNew ? "animate-pop-in" : ""
-              }`}
-              style={{
-                aspectRatio: "1",
-                background:  revealed ? PUZZLE_CELL_COLORS[i] : "rgba(255,255,255,0.05)",
-                border:      revealed
-                  ? "2px solid rgba(255,255,255,0.3)"
-                  : "2px dashed rgba(255,255,255,0.13)",
-                boxShadow:   revealed
-                  ? `0 4px 18px rgba(139,92,246,0.5), inset 0 1px 3px rgba(255,255,255,0.2)`
-                  : "none",
-                transition:  "background 0.4s ease, box-shadow 0.4s ease",
-              }}
-            >
-              {revealed ? (
-                <span style={{ fontSize: 22, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.5))" }}>
-                  {PUZZLE_CELL_EMOJIS[i]}
-                </span>
-              ) : (
-                <span style={{ fontSize: 16, color: "rgba(255,255,255,0.15)", userSelect: "none" }}>✦</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Flash on correct */}
-      {monsterHit && (
-        <div className="text-center font-black text-violet-300 animate-pop-in" style={{ fontSize: "13px", marginBottom: 2 }}>
-          🧩 조각 획득!
-        </div>
-      )}
-
-      {/* Progress bar */}
-      <div className="mx-4 mb-3 mt-1">
-        <div className="flex justify-between text-[10px] font-black text-violet-400 mb-0.5 opacity-80">
-          <span>✨ 완성도</span>
-          <span>{correctCount} / {MONSTER_MAX_HP} 정답</span>
-        </div>
-        <div className="rounded-full overflow-hidden h-2.5" style={{ background: "rgba(255,255,255,0.07)" }}>
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${puzzlePct}%`,
-              background: "linear-gradient(90deg,#a855f7,#6366f1,#3b82f6)",
-              boxShadow: "0 0 10px rgba(168,85,247,0.7)",
-            }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Minimal arena metadata needed by BattleArena — satisfied by TypeInfo or a review pseudo-type. */
-type BattleArenaInfo = {
-  monster:     string;
-  monsterName: string;
-  groundColor: string;
-  /** Large battle sprite — 110px in the arena. */
-  monsterImage: string;
-  /** Small icon — shown in the HP bar (top-left). */
-  monsterIcon:  string;
-};
-
-// ─── QuestionDisplay ──────────────────────────────────────────────────────────
-/**
- * Renders either a text question or an image question depending on what the
- * GameQuestion contains.
- *
- * - Text question  : `q.text` is non-empty  → display as styled text.
- * - Image question : `q.questionImageUrl` is non-empty → display as <img>.
- * - Neither        : show a fallback message.
- */
-function QuestionDisplay({
-  question,
-  className = "",
-  style,
-}: {
-  question:  { text: string; questionImageUrl: string };
-  className?: string;
-  style?:     React.CSSProperties;
-}) {
-  if (question.text) {
-    return (
-      <p
-        className={`relative font-black tracking-wide leading-none select-none ${className}`}
-        style={{
-          fontSize: "clamp(2.4rem,8vw,3.5rem)",
-          color: "#ffffff",
-          letterSpacing: "0.04em",
-          textShadow: "0 2px 16px rgba(139,92,246,0.6)",
-          ...style,
-        }}
-      >
-        {question.text}
-      </p>
-    );
-  }
-
-  if (question.questionImageUrl) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={question.questionImageUrl}
-        alt="문제 이미지"
-        className={`rounded-xl object-contain mx-auto block ${className}`}
-        style={{
-          width:     "100%",
-          height:    "auto",
-          maxWidth:  "100%",
-          display:   "block",
-          ...style,
-        }}
-        onError={(e) => {
-          const el = e.currentTarget;
-          el.style.display = "none";
-          const fallback = el.nextElementSibling as HTMLElement | null;
-          if (fallback) fallback.style.display = "block";
-        }}
-      />
-    );
-  }
-
-  // Fallback when neither text nor image is available.
-  return (
-    <p
-      className={`text-white/50 text-base font-bold ${className}`}
-      style={style}
-    >
-      문제를 불러오지 못했어요
-    </p>
-  );
-}
-
-// Image load-error fallback element (hidden by default, revealed by onError above).
-function ImageLoadFallback() {
-  return (
-    <p className="text-white/50 text-base font-bold hidden">
-      이미지를 불러오지 못했어요
-    </p>
-  );
-}
-
-function BattleArena({
-  arenaInfo,
-  monsterMaxHp = MONSTER_MAX_HP,
-  correctCount,
-  monsterHp,
-  charAttacking,
-  monsterHit,
-  monsterCounter,
-  damageKey,
-  combo,
-  character,
-}: {
-  arenaInfo:      BattleArenaInfo;
-  monsterMaxHp?:  number;
-  correctCount:   number;
-  monsterHp:      number;
-  charAttacking:  boolean;
-  monsterHit:     boolean;
-  monsterCounter: boolean;
-  damageKey:      number;
-  combo:          number;
-  character:      string;
-}) {
-  const charLeft   = CHAR_LEFT[Math.min(correctCount, CHAR_LEFT.length - 1)];
-  const isDefeated = monsterHp <= 0;
-  const hpPct      = Math.max((monsterHp / monsterMaxHp) * 100, 0);
-
-  const hpBarGradient =
-    hpPct > 60 ? "linear-gradient(90deg,#059669,#10b981,#34d399)" :
-    hpPct > 30 ? "linear-gradient(90deg,#b45309,#f59e0b,#fcd34d)" :
-                 "linear-gradient(90deg,#991b1b,#ef4444,#fca5a5)";
-
-  return (
-    <div
-      className="relative rounded-3xl overflow-hidden shadow-2xl"
-      style={{
-        height: "280px",
-        backgroundImage:    "url('/assets/background/origbig.png')",
-        backgroundSize:     "cover",
-        backgroundPosition: "center 60%",
-        backgroundColor:    "#7ec8a0",
-      }}
-    >
-      {/* ── Ground strip ─────────────────────────────────────────── */}
-      <div
-        className="absolute bottom-0 left-0 right-0 rounded-b-3xl pointer-events-none"
-        style={{
-          height: "50px",
-          background: "linear-gradient(to top, rgba(20,83,45,0.7) 0%, rgba(22,163,74,0.3) 60%, transparent 100%)",
-        }}
-      />
-      {/* Dashed path */}
-      <div className="absolute bottom-[3.2rem] left-[12%] right-[20%] pointer-events-none" style={{ borderTop: "2px dashed rgba(255,255,255,0.3)" }} />
-
-      {/* ── Monster HP bar (top overlay) ─────────────────────────── */}
-      <div className="absolute top-0 left-0 right-0 z-30 px-3 pt-2.5 pb-3"
-           style={{ background: "linear-gradient(to bottom,rgba(0,0,0,0.55),rgba(0,0,0,0.3))", backdropFilter: "blur(6px)" }}>
-        <div className="flex items-center gap-2">
-          {/* Small monster icon — matches the large sprite */}
-          <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center">
-            {isDefeated ? (
-              <span className="text-2xl leading-none select-none">💨</span>
-            ) : (
-              <img
-                src={arenaInfo.monsterIcon}
-                alt={arenaInfo.monsterName}
-                style={{
-                  width: "32px",
-                  height: "32px",
-                  objectFit: "contain",
-                  filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.6))",
-                }}
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                  const span = document.createElement("span");
-                  span.style.fontSize = "1.5rem";
-                  span.style.lineHeight = "1";
-                  span.textContent = arenaInfo.monster;
-                  e.currentTarget.parentElement?.appendChild(span);
-                }}
-              />
-            )}
-          </div>
-          <div className="flex-1">
-            <div className="flex justify-between mb-1.5">
-              <span className="text-[11px] font-black text-white tracking-wider drop-shadow">{arenaInfo.monsterName}</span>
-              <span className="text-[10px] font-black tabular-nums" style={{ color: hpPct > 60 ? "#6ee7b7" : hpPct > 30 ? "#fde68a" : "#fca5a5" }}>
-                HP {Math.max(monsterHp, 0)}/{monsterMaxHp}
-              </span>
-            </div>
-            {/* HP bar outer shell */}
-            <div className="rounded-full overflow-hidden" style={{
-              height: "14px",
-              background: "rgba(0,0,0,0.5)",
-              border: "1.5px solid rgba(255,255,255,0.15)",
-              boxShadow: "inset 0 2px 4px rgba(0,0,0,0.4)",
-            }}>
-              {/* HP bar fill */}
-              <div
-                className={`h-full rounded-full transition-[width] duration-500 ease-out relative overflow-hidden ${hpPct <= 30 ? "animate-[pulse_0.8s_ease-in-out_infinite]" : ""}`}
-                style={{ width: `${hpPct}%`, background: hpBarGradient }}
-              >
-                {/* Gloss on bar */}
-                <div className="absolute inset-x-0 top-0 bottom-1/2 rounded-t-full pointer-events-none" style={{ background: "rgba(255,255,255,0.25)" }} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Character (main.png) ───────────────────────────────────────────────── */}
-      {/* Shadow under character */}
-      <div
-        className="absolute z-10 rounded-full pointer-events-none"
-        style={{
-          left:      charLeft,
-          bottom:    "2.4rem",
-          transform: "translateX(-50%)",
-          width:     "72px",
-          height:    "16px",
-          background: "radial-gradient(ellipse, rgba(0,0,0,0.3) 0%, transparent 70%)",
-          transition: "left 0.55s cubic-bezier(0.34,1.56,0.64,1)",
-        }}
-      />
-      <div
-        className={`absolute z-20 ${charAttacking ? "animate-char-attack" : ""}`}
-        style={{
-          left:       charLeft,
-          bottom:     "2.6rem",
-          transform:  "translateX(-50%)",
-          transition: "left 0.55s cubic-bezier(0.34, 1.56, 0.64, 1)",
-          filter:     charAttacking
-            ? "drop-shadow(0 0 16px rgba(250,204,21,1)) drop-shadow(0 4px 12px rgba(0,0,0,0.5))"
-            : "drop-shadow(0 4px 12px rgba(0,0,0,0.4))",
-        }}
-      >
-        <img
-          src={HERO_IMG}
-          alt="hero"
-          style={{ width: "80px", height: "auto", objectFit: "contain", display: "block" }}
-          onError={(e) => {
-            const el = e.currentTarget;
-            el.style.display = "none";
-            const span = document.createElement("span");
-            span.style.fontSize = "4rem";
-            span.style.lineHeight = "1";
-            span.textContent = character;
-            el.parentElement?.appendChild(span);
-          }}
-        />
-      </div>
-
-      {/* Slash burst when attacking */}
-      {charAttacking && (
-        <div
-          className="absolute select-none pointer-events-none z-30 animate-pop-in"
-          style={{ left: charLeft, bottom: "4.2rem", fontSize: "2.4rem", transform: "translateX(32px)" }}
-        >
-          ⚔️
-        </div>
-      )}
-      {charAttacking && (
-        <div
-          className="absolute select-none pointer-events-none z-30 animate-pop-in"
-          style={{ left: charLeft, bottom: "3rem", fontSize: "2rem", transform: "translateX(58px)", animationDelay: "60ms" }}
-        >
-          ✨
-        </div>
-      )}
-
-      {/* Counter-attack hit marker */}
-      {monsterCounter && (
-        <div
-          className="absolute text-4xl animate-pop-in select-none pointer-events-none z-30"
-          style={{ left: charLeft, bottom: "5rem", transform: "translateX(-68px)" }}
-        >
-          💢
-        </div>
-      )}
-
-      {/* ── Monster sprite ─────────────────────────────────────────────────────── */}
-      <div
-        className="absolute flex flex-col items-center z-20"
-        style={{ right: "7%", bottom: "2.5rem" }}
-      >
-        {/* Floating damage number */}
-        <div className="relative h-12 flex justify-center items-end">
-          {damageKey > 0 && (
-            <span
-              key={damageKey}
-              className="absolute left-1/2 bottom-0 font-black animate-damage-float select-none pointer-events-none"
-              style={{
-                fontSize: "2rem",
-                color: "#ef4444",
-                textShadow: "0 0 12px rgba(239,68,68,0.8), 0 2px 4px rgba(0,0,0,0.4)",
-              }}
-            >
-              −1
-            </span>
-          )}
-        </div>
-
-        {/* Monster image */}
-        {isDefeated ? (
-          <span style={{ fontSize: "5rem", lineHeight: 1, opacity: 0.5, filter: "grayscale(1)" }}>💨</span>
-        ) : (
-          <img
-            src={arenaInfo.monsterImage}
-            alt={arenaInfo.monsterName}
-            className={
-              monsterHit     ? "animate-monster-hit"     :
-              monsterCounter ? "animate-monster-counter" : ""
-            }
-            style={{
-              width:  "110px",
-              height: "auto",
-              objectFit: "contain",
-              display: "block",
-              filter: monsterHit
-                ? "drop-shadow(0 0 24px rgba(239,68,68,1)) drop-shadow(0 0 8px rgba(239,68,68,0.6)) brightness(1.8)"
-                : "drop-shadow(0 6px 16px rgba(0,0,0,0.45))",
-              transition: "filter 0.08s",
-            }}
-            onError={(e) => {
-              // fallback to emoji if image fails to load
-              e.currentTarget.style.display = "none";
-              const span = document.createElement("span");
-              span.style.fontSize = "5.5rem";
-              span.style.lineHeight = "1";
-              span.textContent = arenaInfo.monster;
-              e.currentTarget.parentElement?.appendChild(span);
-            }}
-          />
-        )}
-      </div>
-
-      {/* ── Combo flash ────────────────────────────────────────────────────────── */}
-      {charAttacking && combo >= 3 && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
-          <div className="animate-pop-in bg-orange-400/90 text-white font-black text-base rounded-2xl px-6 py-2.5 shadow-2xl">
-            🔥 {combo}콤보 공격!
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── FeedbackOverlay ──────────────────────────────────────────────────────────
-/**
- * Large centered feedback popup — mount with a changing `key` to re-trigger animation.
- * e.g. <FeedbackOverlay key={feedbackKey} feedback={feedback} />
- */
-function FeedbackOverlay({ feedback }: { feedback: string }) {
-  const style = (() => {
-    // wrong-type feedback (battle / grow / puzzle variants)
-    if (feedback.includes("반격") || feedback.includes("시들") || feedback.includes("틀렸어"))
-                                   return { bg: "linear-gradient(135deg,#ef4444,#b91c1c)", glow: "rgba(239,68,68,0.6)",   icon: "💢" };
-    // almost-win encouragement
-    if (feedback.includes("아쉽다"))  return { bg: "linear-gradient(135deg,#f97316,#ea580c)", glow: "rgba(249,115,22,0.6)",  icon: "💪" };
-    if (feedback.includes("스킬"))    return { bg: "linear-gradient(135deg,#f97316,#dc2626)", glow: "rgba(249,115,22,0.7)",  icon: "💥" };
-    // crit-type (battle: 대박, grow: 활짝, puzzle: 완벽)
-    if (feedback.includes("대박") || feedback.includes("활짝") || feedback.includes("완벽"))
-                                   return { bg: "linear-gradient(135deg,#f59e0b,#d97706)", glow: "rgba(245,158,11,0.7)",  icon: "⚡" };
-    // combo-type (battle: 콤보, grow: 연속, puzzle: 연속)
-    if (feedback.includes("콤보") || feedback.includes("연속"))
-                                   return { bg: "linear-gradient(135deg,#f97316,#ea580c)", glow: "rgba(249,115,22,0.6)",  icon: "🔥" };
-    if (feedback.includes("오답 해결")) return { bg: "linear-gradient(135deg,#8b5cf6,#6d28d9)", glow: "rgba(139,92,246,0.7)", icon: "🌟" };
-    if (feedback.includes("보호막"))    return { bg: "linear-gradient(135deg,#3b82f6,#1d4ed8)", glow: "rgba(59,130,246,0.7)",  icon: "🛡️" };
-    if (feedback.includes("+10초"))     return { bg: "linear-gradient(135deg,#10b981,#047857)", glow: "rgba(16,185,129,0.7)",  icon: "⏰" };
-    if (feedback.includes("폭탄"))      return { bg: "linear-gradient(135deg,#f97316,#b45309)", glow: "rgba(249,115,22,0.7)",  icon: "💣" };
-    if (feedback.includes("❌"))        return { bg: "linear-gradient(135deg,#ef4444,#b91c1c)", glow: "rgba(239,68,68,0.6)",   icon: "💢" };
-    return                                      { bg: "linear-gradient(135deg,#22c55e,#16a34a)", glow: "rgba(34,197,94,0.5)",   icon: "✨" };
-  })();
-
-  return (
-    <div
-      className="animate-feedback-burst fixed z-[150] pointer-events-none select-none"
-      style={{ top: "42%", left: "50%" }}
-    >
-      <div
-        className="rounded-3xl px-8 py-5 text-center"
-        style={{
-          background: style.bg,
-          boxShadow: `0 0 0 6px rgba(255,255,255,0.15), 0 8px 40px ${style.glow}`,
-          minWidth: "200px",
-        }}
-      >
-        <div style={{ fontSize: (feedback.includes("대박") || feedback.includes("활짝") || feedback.includes("완벽")) ? "3.4rem" : "2.8rem", lineHeight: 1 }}>
-          {style.icon}
-        </div>
-        <div
-          className="font-black text-white mt-1 leading-tight"
-          style={{
-            fontSize: feedback.includes("대박")
-              ? "clamp(2rem, 7.5vw, 2.8rem)"
-              : "clamp(1.6rem, 6vw, 2.2rem)",
-            textShadow: feedback.includes("대박")
-              ? "0 0 20px rgba(255,255,255,0.8), 0 2px 8px rgba(0,0,0,0.4)"
-              : "0 2px 8px rgba(0,0,0,0.4)",
-          }}
-        >
-          {feedback}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── StatCard ─────────────────────────────────────────────────────────────────
-function StatCard({
-  label,
-  value,
-  valueColor,
-}: {
-  label: string;
-  value: string;
-  valueColor: string;
-}) {
-  return (
-    <div
-      className="game-card rounded-2xl p-3 text-center"
-      style={{
-        background:    "rgba(255,255,255,0.92)",
-        backdropFilter: "blur(10px)",
-        border:        "1.5px solid rgba(255,255,255,0.7)",
-        boxShadow:     "0 4px 20px rgba(79,70,229,0.1), inset 0 1px 2px rgba(255,255,255,0.9)",
-      }}
-    >
-      <div className="ty-stat-label mb-1">{label}</div>
-      <div className={`ty-stat-value ${valueColor}`}>{value}</div>
-    </div>
-  );
-}
-
-// ─── StatsPanel ───────────────────────────────────────────────────────────────
-/** Raw JSON export record (English keys — for developer / API use). */
-function buildJsonRecord(stats: LifetimeStats, stagesClearedCount: number) {
-  const accuracy = stats.totalSolved > 0
-    ? Math.round((stats.totalCorrect / stats.totalSolved) * 100)
-    : 0;
-  return {
-    exportDate:        todayStr(),
-    totalSolved:       stats.totalSolved,
-    totalCorrect:      stats.totalCorrect,
-    totalWrong:        stats.totalWrong,
-    accuracy:          `${accuracy}%`,
-    bestCombo:         stats.bestCombo,
-    clearedTypeIds:    stagesClearedCount,
-    reviewsDone:       stats.reviewsDone,
-    streakDays:        stats.streakDays,
-    lastCompletedDate: stats.lastCompletedDate,
-  };
-}
-
-/** Korean-header CSV row for teacher / Excel use. */
-function buildCsvRow(stats: LifetimeStats, stagesClearedCount: number): { headers: string[]; values: (string | number)[] } {
-  const accuracy = stats.totalSolved > 0
-    ? Math.round((stats.totalCorrect / stats.totalSolved) * 100)
-    : 0;
-  return {
-    headers: ["날짜", "총 문제 수", "정답 수", "오답 수", "정답률", "최고 콤보", "클리어 스테이지", "연속 학습일"],
-    values:  [
-      todayStr(),
-      stats.totalSolved,
-      stats.totalCorrect,
-      stats.totalWrong,
-      `${accuracy}%`,
-      stats.bestCombo,
-      stagesClearedCount,
-      stats.streakDays,
-    ],
-  };
-}
-
-function exportStats(stats: LifetimeStats, stagesClearedCount: number, format: "json" | "excel") {
-  const today = todayStr();
-
-  if (format === "json") {
-    const record = buildJsonRecord(stats, stagesClearedCount);
-    const blob   = new Blob([JSON.stringify(record, null, 2)], { type: "application/json" });
-    triggerDownload(blob, `mathgame_stats_${today}.json`);
-  } else {
-    // CSV with UTF-8 BOM so Excel opens Korean text correctly
-    const { headers, values } = buildCsvRow(stats, stagesClearedCount);
-    const escape = (v: string | number) => {
-      const s = String(v);
-      return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const csv  = "\uFEFF" + headers.map(escape).join(",") + "\n" + values.map(escape).join(",");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    triggerDownload(blob, `mathgame_report_${today}.csv`);
-  }
-}
-
-function triggerDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a   = document.createElement("a");
-  a.href     = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-// ─── 학습 리포트 생성 ──────────────────────────────────────────────────────────
-type ReportLine = {
-  kind: "summary" | "good" | "warn" | "tip";
-  icon: string;
-  text: string;
-};
-
-function buildReport(stats: LifetimeStats, stagesClearedCount: number): ReportLine[] {
-  const accuracy = stats.totalSolved > 0
-    ? Math.round((stats.totalCorrect / stats.totalSolved) * 100)
-    : 0;
-
-  const lines: ReportLine[] = [];
-
-  // No data yet
-  if (stats.totalSolved === 0) {
-    lines.push({ kind: "tip", icon: "🌱", text: "아직 학습 기록이 없어요. 첫 번째 문제에 도전해봐요!" });
-    return lines;
-  }
-
-  // ── 요약 ──
-  lines.push({
-    kind: "summary",
-    icon: "📚",
-    text: `총 ${stats.totalSolved}문제를 풀었고, 정답률은 ${accuracy}%예요.`,
-  });
-
-  // ── 정답/오답 ──
-  if (accuracy >= 90) {
-    lines.push({ kind: "good", icon: "✨", text: `정답률 ${accuracy}%! 정말 훌륭해요. 거의 모든 문제를 맞혔어요.` });
-  } else if (accuracy >= 70) {
-    lines.push({ kind: "good", icon: "💪", text: `정답률 ${accuracy}%로 안정적이에요. 조금만 더 집중하면 90%도 가능해요!` });
-  } else {
-    lines.push({ kind: "warn", icon: "📝", text: `정답률이 ${accuracy}%예요. 틀린 문제를 복습하면 빠르게 나아질 수 있어요.` });
-  }
-
-  // ── 스테이지 ──
-  if (stagesClearedCount >= 3) {
-    lines.push({ kind: "good", icon: "🗺️", text: `${stagesClearedCount}개의 스테이지를 클리어했어요! 퀘스트 마스터에 가까워지고 있어요.` });
-  } else if (stagesClearedCount > 0) {
-    lines.push({ kind: "summary", icon: "🗺️", text: `${stagesClearedCount}개의 스테이지를 클리어했어요.` });
-  }
-
-  // ── 콤보 ──
-  if (stats.bestCombo >= 5) {
-    lines.push({ kind: "good", icon: "🔥", text: `최고 ${stats.bestCombo}콤보를 달성했어요! 연속 집중력이 뛰어나요.` });
-  } else if (stats.bestCombo >= 3) {
-    lines.push({ kind: "summary", icon: "⚡", text: `최고 ${stats.bestCombo}콤보를 달성했어요. 더 긴 콤보에 도전해봐요!` });
-  }
-
-  // ── 오답 ──
-  if (stats.totalWrong > 0) {
-    lines.push({
-      kind: stats.totalWrong >= 5 ? "warn" : "summary",
-      icon: "❌",
-      text: `틀린 문제가 ${stats.totalWrong}개 있어요.${stats.reviewsDone === 0 ? " 복습 던전에서 확인해보면 좋아요!" : ""}`,
-    });
-  }
-
-  // ── 복습 ──
-  if (stats.reviewsDone > 0) {
-    lines.push({ kind: "good", icon: "🔮", text: `복습 던전을 ${stats.reviewsDone}번 완료해서 틀린 문제를 꼼꼼히 점검했어요.` });
-  }
-
-  // ── 스트릭 ──
-  if (stats.streakDays >= 7) {
-    lines.push({ kind: "good", icon: "🌟", text: `${stats.streakDays}일 연속 학습 중이에요! 이 습관이 실력을 만들어요.` });
-  } else if (stats.streakDays >= 3) {
-    lines.push({ kind: "good", icon: "🔥", text: `${stats.streakDays}일 연속 꾸준히 학습하고 있어요. 잘하고 있어요!` });
-  }
-
-  // ── 추천 ──
-  if (accuracy < 60 || stats.totalWrong >= 5) {
-    lines.push({ kind: "tip", icon: "💡", text: "다음에는 복습 던전으로 틀린 문제를 다시 확인해보면 좋아요." });
-  } else if (stats.reviewsDone === 0 && stats.totalWrong > 0) {
-    lines.push({ kind: "tip", icon: "💡", text: "복습 던전에서 틀린 문제를 한 번 더 풀어보면 완벽해질 수 있어요!" });
-  } else if (stagesClearedCount === 0) {
-    lines.push({ kind: "tip", icon: "💡", text: "첫 스테이지에 도전해서 수학 퀘스트를 시작해봐요!" });
-  } else {
-    lines.push({ kind: "tip", icon: "💡", text: "다음 스테이지에 도전해서 더 어려운 문제에 맞서봐요!" });
-  }
-
-  return lines;
-}
-
-function StatsPanel({
-  stats,
-  stagesClearedCount,
-  onClose,
-}: {
-  stats:              LifetimeStats;
-  stagesClearedCount: number;
-  onClose:            () => void;
-}) {
-  const [showReport, setShowReport] = useState(false);
-  const [showExport, setShowExport] = useState(false);
-
-  const accuracy = stats.totalSolved > 0
-    ? Math.round((stats.totalCorrect / stats.totalSolved) * 100)
-    : 0;
-
-  const streakMsg =
-    stats.streakDays >= 7 ? "🌟 일주일 연속 학습! 정말 대단해요!"  :
-    stats.streakDays >= 3 ? `🔥 ${stats.streakDays}일 연속 학습 중이에요!` :
-    stats.streakDays >= 1 ? "📅 오늘도 함께 성장해요!"              :
-    "🌱 학습을 시작해봐요!";
-
-  const rows: { icon: string; label: string; value: string }[] = [
-    { icon: "📚", label: "총 풀이 문제",    value: `${stats.totalSolved}개` },
-    { icon: "✅", label: "총 정답",          value: `${stats.totalCorrect}개` },
-    { icon: "🎯", label: "정답률",           value: `${accuracy}%` },
-    { icon: "❌", label: "오답 수",          value: `${stats.totalWrong}개` },
-    { icon: "🔥", label: "최고 콤보",        value: `${stats.bestCombo}콤보` },
-    { icon: "🗺️", label: "클리어 스테이지", value: `${stagesClearedCount}개` },
-    { icon: "🔮", label: "복습 던전 완료",   value: `${stats.reviewsDone}회` },
-    { icon: "📅", label: "연속 학습일",      value: `${stats.streakDays}일` },
-  ];
-
-  const reportLines = buildReport(stats, stagesClearedCount);
-
-  // kind → style map
-  const kindStyle: Record<ReportLine["kind"], { bg: string; border: string; text: string }> = {
-    summary: { bg: "#f0f9ff", border: "#bae6fd", text: "#0369a1" },
-    good:    { bg: "#f0fdf4", border: "#bbf7d0", text: "#166534" },
-    warn:    { bg: "#fefce8", border: "#fde68a", text: "#92400e" },
-    tip:     { bg: "#fdf4ff", border: "#e9d5ff", text: "#6b21a8" },
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden animate-pop-in"
-        style={{ maxHeight: "92dvh", display: "flex", flexDirection: "column" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* ── Header ── */}
-        <div
-          className="flex-shrink-0 px-6 pt-5 pb-4"
-          style={{ background: "linear-gradient(135deg,#0e7490,#0891b2)" }}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-black text-white leading-tight">
-                {showReport ? "📋 학습 리포트" : "📊 내 학습 기록"}
-              </h2>
-              <p className="text-cyan-100/80 text-[11px] mt-0.5">{streakMsg}</p>
-            </div>
-            {/* View toggle */}
-            <button
-              onClick={() => setShowReport((v) => !v)}
-              className="rounded-xl px-3 py-1.5 text-xs font-black transition-all active:scale-95"
-              style={{
-                background: showReport ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.15)",
-                border: "1px solid rgba(255,255,255,0.3)",
-                color: "#fff",
-              }}
-            >
-              {showReport ? "📊 기록 보기" : "📋 리포트"}
-            </button>
-          </div>
-        </div>
-
-        {/* ── Body (scrollable) ── */}
-        <div className="bg-white flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2" style={{ scrollbarWidth: "none" }}>
-
-          {showReport ? (
-            /* ── 학습 리포트 뷰 ── */
-            <>
-              <p className="text-[11px] text-gray-400 font-bold text-center mb-1">
-                학부모·선생님께 전달할 수 있는 학습 요약이에요
-              </p>
-              <div className="flex flex-col gap-2">
-                {reportLines.map((line, i) => {
-                  const s = kindStyle[line.kind];
-                  return (
-                    <div
-                      key={i}
-                      className="flex items-start gap-2.5 rounded-2xl px-4 py-3"
-                      style={{ background: s.bg, border: `1px solid ${s.border}` }}
-                    >
-                      <span className="text-lg flex-shrink-0 mt-0.5">{line.icon}</span>
-                      <p className="text-sm font-bold leading-snug" style={{ color: s.text }}>
-                        {line.text}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            /* ── 기록 그리드 뷰 ── */
-            <>
-              <div className="grid grid-cols-2 gap-2">
-                {rows.map((r) => (
-                  <div key={r.label} className="rounded-2xl bg-gray-50 border border-gray-100 px-3 py-2.5 flex items-center gap-2">
-                    <span className="text-lg flex-shrink-0">{r.icon}</span>
-                    <div className="min-w-0">
-                      <div className="text-[10px] text-gray-400 font-bold leading-tight truncate">{r.label}</div>
-                      <div className="text-sm font-black text-gray-700 leading-tight">{r.value}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* ── 선생님용 데이터 내보내기 (accordion) ── */}
-          <div className="mt-1 rounded-2xl border border-gray-100 overflow-hidden">
-            <button
-              onClick={() => setShowExport((v) => !v)}
-              className="w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-gray-50 active:bg-gray-100"
-            >
-              <span className="text-[11px] font-black text-gray-500">🗂️ 선생님용 데이터 내보내기</span>
-              <span className="text-gray-300 text-xs">{showExport ? "▲" : "▼"}</span>
-            </button>
-            {showExport && (
-              <div className="flex flex-col gap-2 px-4 pb-4">
-                {/* Primary: Excel download */}
-                <button
-                  onClick={() => exportStats(stats, stagesClearedCount, "excel")}
-                  className="w-full rounded-xl py-2.5 font-black text-sm text-white transition-all active:scale-95 flex items-center justify-center gap-2"
-                  style={{ background: "linear-gradient(135deg,#166534,#15803d)" }}
-                >
-                  📊 엑셀 다운로드
-                </button>
-                <p className="text-[10px] text-gray-400 text-center -mt-1">
-                  한글 컬럼 포함 · 엑셀/Numbers에서 바로 열기 가능
-                </p>
-                {/* Secondary: JSON (developer) */}
-                <button
-                  onClick={() => exportStats(stats, stagesClearedCount, "json")}
-                  className="w-full rounded-xl py-2 font-bold text-xs text-gray-400 border border-gray-200 bg-gray-50 transition-all active:scale-95 flex items-center justify-center gap-1.5"
-                >
-                  ⚙️ 데이터 원본 (개발자용)
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* ── 닫기 ── */}
-          <button
-            onClick={onClose}
-            className="mt-1 w-full rounded-2xl py-3 font-black text-sm text-white transition-all active:scale-95"
-            style={{ background: "linear-gradient(135deg,#0e7490,#0891b2)" }}
-          >
-            닫기
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── TeacherDashboardScreen ───────────────────────────────────────────────────
 /**
@@ -7540,99 +6218,6 @@ function TeacherPanel({
           >
             완료
           </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── TutorialModal ────────────────────────────────────────────────────────────
-function TutorialModal({ onClose }: { onClose: () => void }) {
-  const [step, setStep] = useState(0);
-  const total = TUTORIAL_STEPS.length;
-  const current = TUTORIAL_STEPS[step];
-  const isLast = step === total - 1;
-
-  return (
-    /* Backdrop */
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center px-5"
-      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}
-    >
-      {/* Card */}
-      <div
-        className="relative w-full max-w-xs rounded-3xl overflow-hidden shadow-2xl animate-pop-in"
-        style={{ background: "linear-gradient(160deg,#1e293b,#0f172a)", border: "1px solid rgba(255,255,255,0.1)" }}
-      >
-        {/* Top accent strip */}
-        <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg,#6366f1,#a855f7,#ec4899)" }} />
-
-        {/* Skip button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-white/30 hover:text-white/60 text-xs font-bold transition-colors"
-        >
-          건너뛰기
-        </button>
-
-        {/* Content */}
-        <div className="px-7 pt-8 pb-6 flex flex-col items-center text-center">
-          {/* Step icon */}
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-5 shadow-xl"
-            style={{ background: "linear-gradient(135deg,rgba(99,102,241,0.3),rgba(168,85,247,0.2))", border: "2px solid rgba(139,92,246,0.4)" }}
-          >
-            {current.icon}
-          </div>
-
-          {/* Step title */}
-          <h2 className="text-white font-black text-lg mb-3">{current.title}</h2>
-
-          {/* Step description */}
-          <p className="text-white/60 text-sm leading-relaxed whitespace-pre-line mb-6">
-            {current.desc}
-          </p>
-
-          {/* Dot indicators */}
-          <div className="flex gap-2 mb-6">
-            {TUTORIAL_STEPS.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setStep(i)}
-                className="rounded-full transition-all"
-                style={{
-                  width:      i === step ? "20px" : "8px",
-                  height:     "8px",
-                  background: i === step ? "#818cf8" : "rgba(255,255,255,0.2)",
-                }}
-              />
-            ))}
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex gap-3 w-full">
-            {step > 0 && (
-              <button
-                onClick={() => setStep((s) => s - 1)}
-                className="flex-1 rounded-2xl py-3 text-sm font-black text-white/50 transition-all active:scale-95"
-                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
-              >
-                ← 이전
-              </button>
-            )}
-            <button
-              onClick={() => isLast ? onClose() : setStep((s) => s + 1)}
-              className="flex-1 rounded-2xl py-3 text-sm font-black text-white transition-all active:scale-95"
-              style={{ background: isLast ? "linear-gradient(135deg,#22c55e,#16a34a)" : "linear-gradient(135deg,#6366f1,#4f46e5)" }}
-            >
-              {isLast ? "🚀 시작하기!" : "다음 →"}
-            </button>
-          </div>
-
-          {/* Step counter */}
-          <p className="mt-4 text-white/25 text-[10px] font-bold">
-            {step + 1} / {total}
-          </p>
         </div>
       </div>
     </div>
