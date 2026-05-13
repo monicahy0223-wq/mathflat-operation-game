@@ -152,20 +152,27 @@ export default function ModeSelect({ onSelect }: Props) {
             {/* 지혜의 탑 씬 */}
             <div className="rounded-2xl overflow-hidden flex flex-col"
               style={{ background: "linear-gradient(160deg,#0d0a2e 0%,#1e1058 40%,#2d1b6b 100%)", border: "1.5px solid rgba(167,139,250,0.45)", boxShadow: "0 6px 20px rgba(0,0,0,0.3)" }}>
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "10px 10px 6px", gap: 5 }}>
-                {/* 탑 */}
-                <div style={{ fontSize: 28, lineHeight: 1, filter: "drop-shadow(0 0 10px rgba(167,139,250,0.8))" }}>🗼</div>
-                {/* 스테이지 목록 */}
-                {[
-                  { emoji: "🧩", label: "기억 조각" },
-                  { emoji: "📖", label: "오답 복원" },
-                  { emoji: "🏛", label: "탑 복구" },
-                ].map(({ emoji, label }) => (
-                  <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <span style={{ fontSize: 11 }}>{emoji}</span>
-                    <span style={{ color: "#ddd6fe", fontWeight: 700, fontSize: 10 }}>{label}</span>
+              <div style={{ flex: 1, position: "relative", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "10px 12px 8px" }}>
+                {/* 층수 + 진행 바 */}
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 6 }}>
+                    <span style={{ fontSize: 10, fontWeight: 900, color: "#e9d5ff", background: "rgba(139,92,246,0.25)", border: "1.5px solid #a78bfa", borderRadius: 999, padding: "1px 7px" }}>2층</span>
+                    <div style={{ flex: 1, height: 5, background: "rgba(255,255,255,0.1)", borderRadius: 999, overflow: "hidden" }}>
+                      <div style={{ width: "40%", height: "100%", background: "linear-gradient(90deg,#7c3aed,#a78bfa)" }} />
+                    </div>
                   </div>
-                ))}
+                </div>
+                {/* 플레이 씬 */}
+                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+                  <img src="/assets/character/hero.png" alt="" style={{ width: 32, height: 32, objectFit: "contain" }}
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                  <span style={{ fontSize: 36, lineHeight: 1, filter: "drop-shadow(0 0 14px rgba(167,139,250,0.9))" }}>🗼</span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <span style={{ fontSize: 9, opacity: 1 }}>✦</span>
+                    <span style={{ fontSize: 9, opacity: 1 }}>📖</span>
+                    <span style={{ fontSize: 9, opacity: 0.2 }}>○</span>
+                  </div>
+                </div>
               </div>
               <div style={{ background: "rgba(49,10,101,0.88)", padding: "4px 10px", textAlign: "center" }}>
                 <span style={{ color: "#c4b5fd", fontWeight: 900, fontSize: 10 }}>🏰 지혜의 탑</span>
