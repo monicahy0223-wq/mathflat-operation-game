@@ -461,6 +461,23 @@ function getNextType(typeId: number) {
   return FLAT_TYPES[idx + 1] ?? null;
 }
 
+const DIFFICULTY_ORDER: readonly Difficulty[] = ["easy", "normal", "hard"] as const;
+
+/** Returns the next difficulty within the same zone (easy→normal→hard), or null if already at "hard". */
+function getNextDifficulty(d: Difficulty): Difficulty | null {
+  const idx = DIFFICULTY_ORDER.indexOf(d);
+  return idx >= 0 && idx < DIFFICULTY_ORDER.length - 1
+    ? DIFFICULTY_ORDER[idx + 1]
+    : null;
+}
+
+/** Returns the GameMode to recommend after completing "hard" in the given mode, or null. */
+function getRecommendedZoneMode(mode: GameMode): GameMode | null {
+  if (mode === "grow")   return "battle";
+  if (mode === "battle") return "puzzle";
+  return null;
+}
+
 /** Returns the first type in FLAT_TYPES (the starting unlock). */
 const FIRST_TYPE_ID = FLAT_TYPES[0].id;
 
@@ -1535,11 +1552,13 @@ export default function MathGame({
         setClearedTypeIds((prev) =>
           prev.includes(currentTypeId) ? prev : [...prev, currentTypeId]
         );
-        setUnlockedTypeId((prev) => {
-          const next = getNextType(currentTypeId);
-          if (!next) return prev;
-          return getTypeIndex(next.id) > getTypeIndex(prev) ? next.id : prev;
-        });
+        if (selectedDifficulty === "hard") {
+          setUnlockedTypeId((prev) => {
+            const next = getNextType(currentTypeId);
+            if (!next) return prev;
+            return getTypeIndex(next.id) > getTypeIndex(prev) ? next.id : prev;
+          });
+        }
         setStagesClearedToday((t) => t + 1);
         markDailyComplete(); // stage clear → daily goal met
         addTimer(() => { play("clear"); setPhase("stageClear"); }, 880);
@@ -1836,14 +1855,16 @@ export default function MathGame({
     if (shouldClear) {
       setCoins((c) => c + Math.round(20 * coinMult));
       setClearedTypeIds((prev) =>
-      prev.includes(currentTypeId) ? prev : [...prev, currentTypeId]
-    );
-    setUnlockedTypeId((prev) => {
-      const next = getNextType(currentTypeId);
-      if (!next) return prev;
-      return getTypeIndex(next.id) > getTypeIndex(prev) ? next.id : prev;
-    });
-    setStagesClearedToday((t) => t + 1);
+        prev.includes(currentTypeId) ? prev : [...prev, currentTypeId]
+      );
+      if (selectedDifficulty === "hard") {
+        setUnlockedTypeId((prev) => {
+          const next = getNextType(currentTypeId);
+          if (!next) return prev;
+          return getTypeIndex(next.id) > getTypeIndex(prev) ? next.id : prev;
+        });
+      }
+      setStagesClearedToday((t) => t + 1);
       markDailyComplete(); // skill kills boss → daily goal met
       addTimer(() => { play("clear"); setPhase("stageClear"); }, 950);
     }
@@ -1898,11 +1919,13 @@ export default function MathGame({
         if (shouldClear) {
           setCoins((c) => c + Math.round(20 * coinMult));
           setClearedTypeIds((prev) => prev.includes(currentTypeId) ? prev : [...prev, currentTypeId]);
-          setUnlockedTypeId((prev) => {
-            const next = getNextType(currentTypeId);
-            if (!next) return prev;
-            return getTypeIndex(next.id) > getTypeIndex(prev) ? next.id : prev;
-          });
+          if (selectedDifficulty === "hard") {
+            setUnlockedTypeId((prev) => {
+              const next = getNextType(currentTypeId);
+              if (!next) return prev;
+              return getTypeIndex(next.id) > getTypeIndex(prev) ? next.id : prev;
+            });
+          }
           addTimer(() => setPhase("stageClear"), 950);
         }
 
@@ -2080,12 +2103,15 @@ export default function MathGame({
     try { localStorage.setItem("mathGameMode", mode); } catch { /* ignore */ }
   }, []);
 
-  /** Continue to next type from stageClear — pick difficulty again */
-  const goNextStage = useCallback(() => {
-    const next = getNextType(currentTypeId);
-    if (!next) goToResult();
-    else showDifficultySelect(next.id);
-  }, [currentTypeId, goToResult, showDifficultySelect]);
+  /** Start the next difficulty in the same zone directly from stageClear. */
+  const goNextDifficultyInZone = useCallback((nextDiff: Difficulty) => {
+    startType(currentTypeId, nextDiff);
+  }, [currentTypeId, startType]);
+
+  /** Enter the recommended zone (regionMap) from the stageClear recommendation. */
+  const goToRecommendedZone = useCallback((mode: GameMode) => {
+    enterWorld(mode);
+  }, [enterWorld]);
 
   /** Full reset — used only from the result screen */
   const restartAll = useCallback(() => {
@@ -2348,7 +2374,7 @@ export default function MathGame({
                   style={{ background: "linear-gradient(135deg,#f59e0b,#f97316)", boxShadow: "0 2px 8px rgba(245,158,11,0.35)" }}
                   title="상점"
                 >
-                  🛒
+                  <span className="text-lg">🛒</span>
                 </button>
               </div>
             )}
@@ -3861,10 +3887,23 @@ export default function MathGame({
 
   // ─── stage clear screen ────────────────────────────────────────────────────────
   if (phase === "stageClear") {
-    const nextType  = getNextType(currentTypeId);
-    const hasNext   = nextType !== null;
-    const nextWorld = hasNext ? getWorldForType(nextType!.id) : null;
-    const diffCfg   = DIFFICULTY_CONFIG[selectedDifficulty];
+    const diffCfg    = DIFFICULTY_CONFIG[selectedDifficulty];
+    // within-zone: 다음 난이도 노드 (easy→normal→hard)
+    const nextDiff   = getNextDifficulty(selectedDifficulty);
+    const nextNode   = nextDiff ? REGION_NODES[gameMode].find(n => n.difficulty === nextDiff) : null;
+    // cross-zone: 집중 수련(grow-hard) 또는 드래곤 보스(battle-hard) 클리어 시 추천
+    const recMode    = !nextNode ? getRecommendedZoneMode(gameMode) : null;
+    const recType    = recMode  ? FLAT_TYPES.find(t => t.mode === recMode) : null;
+
+    console.log("[stageClear 진단]", {
+      gameMode,
+      selectedDifficulty,
+      currentTypeId,
+      nextDiff,
+      nextNodeLabel: nextNode?.label ?? null,
+      recMode,
+      recZoneName: recType?.zoneName ?? null,
+    });
 
     return (
       <main
@@ -3984,8 +4023,8 @@ export default function MathGame({
             ) : null}
           </div>
 
-          {/* Next goal teaser */}
-          {hasNext && nextType && (
+          {/* 같은 지역 다음 단계 teaser */}
+          {nextNode && (
             <div
               className="rounded-2xl px-4 py-3 flex items-center gap-3 text-left"
               style={{
@@ -3998,13 +4037,37 @@ export default function MathGame({
                 className="flex-shrink-0 flex items-center justify-center rounded-2xl"
                 style={{ width: 52, height: 52, background: "rgba(255,255,255,0.1)", fontSize: "28px" }}
               >
-                {nextType.emoji}
+                {nextNode.emoji}
               </div>
               <div className="min-w-0">
-                <p className="font-black tracking-widest mb-0.5" style={{ fontSize: "10px", color: "#fcd34d" }}>NEXT CHALLENGE →</p>
-                <p className="font-black text-white truncate" style={{ fontSize: "14px" }}>{nextType.title}</p>
+                <p className="font-black tracking-widest mb-0.5" style={{ fontSize: "10px", color: "#fcd34d" }}>NEXT STAGE →</p>
+                <p className="font-black text-white truncate" style={{ fontSize: "14px" }}>{nextNode.label}</p>
+                <p className="font-medium mt-0.5" style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)" }}>{nextNode.description}</p>
+              </div>
+            </div>
+          )}
+
+          {/* 다른 지역 추천 teaser (hard 클리어 후) */}
+          {recType && (
+            <div
+              className="rounded-2xl px-4 py-3 flex items-center gap-3 text-left"
+              style={{
+                background: "rgba(255,255,255,0.04)",
+                border: "1.5px dashed rgba(255,255,255,0.25)",
+                backdropFilter: "blur(8px)",
+              }}
+            >
+              <div
+                className="flex-shrink-0 flex items-center justify-center rounded-2xl"
+                style={{ width: 52, height: 52, background: "rgba(255,255,255,0.08)", fontSize: "28px" }}
+              >
+                {recType.emoji}
+              </div>
+              <div className="min-w-0">
+                <p className="font-black tracking-widest mb-0.5" style={{ fontSize: "10px", color: "#86efac" }}>💡 다음 지역 추천</p>
+                <p className="font-black text-white truncate" style={{ fontSize: "14px" }}>{recType.zoneName}</p>
                 <p className="font-medium mt-0.5" style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)" }}>
-                  {nextWorld ? `${nextWorld.name} · ` : ""}{GAME_TEXT[gameMode].nextTeaser(nextType.monsterName)}
+                  {recMode === "battle" ? "긴장감 있는 전투에 도전해보세요!" : "틀린 문제를 복습하고 실력을 다져요!"}
                 </p>
               </div>
             </div>
@@ -4012,9 +4075,9 @@ export default function MathGame({
 
           {/* CTA buttons */}
           <div className="flex flex-col gap-2">
-            {hasNext ? (
+            {nextNode ? (
               <button
-                onClick={goNextStage}
+                onClick={() => goNextDifficultyInZone(nextDiff!)}
                 className="w-full rounded-2xl p-4 font-black text-lg text-white transition-all active:scale-95"
                 style={{
                   background: "linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)",
@@ -4022,7 +4085,21 @@ export default function MathGame({
                   animation: "pulse 2s cubic-bezier(0.4,0,0.6,1) infinite",
                 }}
               >
-                {GAME_TEXT[gameMode].nextBtn} → {nextType?.emoji}
+                {nextNode.emoji} {nextNode.label} 도전! →
+              </button>
+            ) : recType ? (
+              <button
+                onClick={() => goToRecommendedZone(recMode!)}
+                className="w-full rounded-2xl p-4 font-black text-lg text-white transition-all active:scale-95"
+                style={{
+                  background: recMode === "battle"
+                    ? "linear-gradient(135deg, #f97316 0%, #dc2626 100%)"
+                    : "linear-gradient(135deg, #6366f1 0%, #7c3aed 100%)",
+                  boxShadow: "0 6px 24px rgba(239,68,68,0.35)",
+                  animation: "pulse 2s cubic-bezier(0.4,0,0.6,1) infinite",
+                }}
+              >
+                {recType.emoji} {recType.zoneName} 도전해보기 →
               </button>
             ) : (
               <button
