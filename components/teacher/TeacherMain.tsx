@@ -112,7 +112,7 @@ export default function TeacherMain({ onGoClassSettings, onGoDashboard, onGoStud
           </div>
           <div className="flex-1">
             <div className="font-black text-slate-800 text-lg">학급 관리</div>
-            <div className="text-slate-500 text-sm mt-0.5">교과서 선택 · 학급 정보 · 학생 목록</div>
+            <div className="text-slate-500 text-sm mt-0.5">학급 정보 · 학생 목록 · 숙제 내기</div>
           </div>
           <div className="text-slate-400 text-xl font-light">›</div>
         </button>
