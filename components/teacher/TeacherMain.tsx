@@ -84,9 +84,9 @@ export default function TeacherMain({ onGoClassSettings, onGoDashboard, onGoStud
               <div className="font-black text-slate-800 text-2xl">{activeClass.name}</div>
               <div className="text-sky-600 text-sm mt-1 font-medium">📚 {textbook?.name ?? "교과서 미선택"}</div>
             </div>
-            <div className="text-right">
+            <div className="flex text-right gap-1 self-center">
               <div className="font-black text-emerald-500 text-4xl leading-none">{settings.students.length}</div>
-              <div className="text-slate-400 text-xs mt-1">명</div>
+              <div className="text-slate-400 text-xs mt-1 self-center">명</div>
             </div>
           </div>
         </div>

@@ -1,13 +1,17 @@
 import type { TeacherAppSettings, ClassInfo, StudentRecord } from "../types/teacher";
 
+// Old saved data may be missing the semester field
+type LegacyClassInfo = Omit<ClassInfo, "semester"> & { semester?: number };
+
 const TEACHER_APP_KEY = "mathGameTeacherApp";
-const SCHEMA_VERSION = 2; // bump when defaults change; triggers migration on stale saved data
+const SCHEMA_VERSION = 3; // bump when defaults change; triggers migration on stale saved data
 
 const DEFAULT_CLASS: ClassInfo = {
   id: "class-1",
   name: "2학년 1반",
   grade: 2,
-  textbookId: "visang",
+  semester: 1,
+  textbookId: "edu-2-1",
 };
 
 // MathGame의 DEFAULT_STUDENTS(s0·s1·s2)와 동일한 id/name
@@ -38,7 +42,6 @@ export function loadTeacherAppSettings(): TeacherAppSettings {
     }
     const parsed = JSON.parse(raw) as TeacherAppSettings & { schemaVersion?: number };
 
-    // ── 마이그레이션: 학생이 없는 이전 버전 데이터 복구 ──────────────────────
     const needsMigration =
       !parsed.schemaVersion ||
       parsed.schemaVersion < SCHEMA_VERSION ||
@@ -50,10 +53,16 @@ export function loadTeacherAppSettings(): TeacherAppSettings {
         Array.isArray(parsed.students) && parsed.students.length > 0
           ? parsed.students
           : DEFAULT_STUDENTS.map((s) => ({ ...s }));
+
+      // Ensure all classes have a semester field (old saves may lack it)
+      const classes = (parsed.classes?.length ? parsed.classes : [{ ...DEFAULT_CLASS }]).map(
+        (c): ClassInfo => ({ ...c, semester: (c as LegacyClassInfo).semester ?? 1 }),
+      );
+
       const migrated = {
         ...parsed,
         schemaVersion: SCHEMA_VERSION,
-        classes: parsed.classes?.length ? parsed.classes : [{ ...DEFAULT_CLASS }],
+        classes,
         activeClassId: parsed.activeClassId || "class-1",
         students,
       } as TeacherAppSettings & { schemaVersion: number };
@@ -64,6 +73,10 @@ export function loadTeacherAppSettings(): TeacherAppSettings {
 
     if (!parsed.classes?.length) parsed.classes = [{ ...DEFAULT_CLASS }];
     if (!parsed.activeClassId) parsed.activeClassId = parsed.classes[0].id;
+    // Ensure semester exists on all classes (defensive, for partially-migrated data)
+    parsed.classes = parsed.classes.map(
+      (c): ClassInfo => ({ ...c, semester: (c as LegacyClassInfo).semester ?? 1 }),
+    );
     return parsed;
   } catch {
     const d = makeDefaults();
@@ -94,5 +107,5 @@ export function getActiveClass(settings: TeacherAppSettings): ClassInfo {
 
 export function getActiveTextbookId(): string {
   const s = loadTeacherAppSettings();
-  return getActiveClass(s).textbookId ?? "visang";
+  return getActiveClass(s).textbookId ?? "edu-2-1";
 }
