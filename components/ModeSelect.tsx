@@ -149,26 +149,26 @@ export default function ModeSelect({ onSelect }: Props) {
               </div>
             </div>
 
-            {/* 스테이지 클리어 씬 */}
+            {/* 지혜의 탑 씬 */}
             <div className="rounded-2xl overflow-hidden flex flex-col"
-              style={{ background: "linear-gradient(160deg,#1c1917 0%,#292524 40%,#44403c 100%)", border: "1.5px solid rgba(251,191,36,0.45)", boxShadow: "0 6px 20px rgba(0,0,0,0.3)" }}>
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "10px 10px 6px", gap: 4 }}>
-                {/* 별 */}
-                <div style={{ fontSize: 24, letterSpacing: 3, filter: "drop-shadow(0 0 8px rgba(251,191,36,0.7))" }}>⭐⭐⭐</div>
-                {/* 클리어 텍스트 */}
-                <div style={{ color: "#fcd34d", fontWeight: 900, fontSize: 13, letterSpacing: "-0.02em" }}>STAGE CLEAR!</div>
-                {/* 보상 */}
-                <div style={{ display: "flex", gap: 6 }}>
-                  <div style={{ background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.35)", borderRadius: 8, padding: "3px 8px", textAlign: "center" }}>
-                    <span style={{ color: "#fcd34d", fontWeight: 900, fontSize: 11 }}>💰 +30</span>
+              style={{ background: "linear-gradient(160deg,#0d0a2e 0%,#1e1058 40%,#2d1b6b 100%)", border: "1.5px solid rgba(167,139,250,0.45)", boxShadow: "0 6px 20px rgba(0,0,0,0.3)" }}>
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "10px 10px 6px", gap: 5 }}>
+                {/* 탑 */}
+                <div style={{ fontSize: 28, lineHeight: 1, filter: "drop-shadow(0 0 10px rgba(167,139,250,0.8))" }}>🗼</div>
+                {/* 스테이지 목록 */}
+                {[
+                  { emoji: "🧩", label: "기억 조각" },
+                  { emoji: "📖", label: "오답 복원" },
+                  { emoji: "🏛", label: "탑 복구" },
+                ].map(({ emoji, label }) => (
+                  <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <span style={{ fontSize: 11 }}>{emoji}</span>
+                    <span style={{ color: "#ddd6fe", fontWeight: 700, fontSize: 10 }}>{label}</span>
                   </div>
-                  <div style={{ background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.35)", borderRadius: 8, padding: "3px 8px", textAlign: "center" }}>
-                    <span style={{ color: "#fcd34d", fontWeight: 900, fontSize: 11 }}>🏆 +150</span>
-                  </div>
-                </div>
+                ))}
               </div>
-              <div style={{ background: "rgba(120,53,15,0.88)", padding: "4px 10px", textAlign: "center" }}>
-                <span style={{ color: "#fcd34d", fontWeight: 900, fontSize: 10 }}>🎉 스테이지 클리어</span>
+              <div style={{ background: "rgba(49,10,101,0.88)", padding: "4px 10px", textAlign: "center" }}>
+                <span style={{ color: "#c4b5fd", fontWeight: 900, fontSize: 10 }}>🏰 지혜의 탑</span>
               </div>
             </div>
 
