@@ -9,13 +9,18 @@ type Props = {
   onBack: () => void;
 };
 
-type Tab = "class" | "students";
+type Tab = "class" | "homework";
 
 export default function TeacherSettings({ onBack }: Props) {
   const [tab, setTab] = useState<Tab>("class");
   const [settings, setSettings] = useState<TeacherAppSettings>(() => loadTeacherAppSettings());
+
   const [isEditingClass, setIsEditingClass] = useState(false);
   const [pendingClass, setPendingClass] = useState<ClassInfo | null>(null);
+
+  const [unitsExpanded, setUnitsExpanded] = useState(false);
+
+  const [isEditingStudents, setIsEditingStudents] = useState(false);
   const [editingStudent, setEditingStudent] = useState<StudentRecord | null>(null);
   const [newStudentName, setNewStudentName] = useState("");
   const [addingStudent, setAddingStudent] = useState(false);
@@ -38,24 +43,32 @@ export default function TeacherSettings({ onBack }: Props) {
     });
   }
 
-  function startEditing() {
+  function startEditingClass() {
     setPendingClass({ ...activeClass });
     setIsEditingClass(true);
   }
 
-  function finishEditing() {
+  function finishEditingClass() {
     if (pendingClass) updateClass(pendingClass);
     setIsEditingClass(false);
     setPendingClass(null);
   }
 
-  function cancelEditing() {
+  function cancelEditingClass() {
     setIsEditingClass(false);
     setPendingClass(null);
   }
 
+  function stopEditingStudents() {
+    setIsEditingStudents(false);
+    setEditingStudent(null);
+    setAddingStudent(false);
+    setNewStudentName("");
+  }
+
   function switchTab(t: Tab) {
-    cancelEditing();
+    cancelEditingClass();
+    stopEditingStudents();
     setTab(t);
   }
 
@@ -74,6 +87,7 @@ export default function TeacherSettings({ onBack }: Props) {
   function selectTextbook(textbookId: string) {
     if (!pendingClass) return;
     setPendingClass({ ...pendingClass, textbookId });
+    setUnitsExpanded(false);
   }
 
   function addStudent() {
@@ -118,10 +132,10 @@ export default function TeacherSettings({ onBack }: Props) {
         <h1 className="font-black text-white text-xl">학급 관리</h1>
       </div>
 
-      {/* 탭 — 콘텐츠와 동일한 너비 제한 */}
+      {/* 탭 */}
       <div className="flex-shrink-0 w-full">
         <div className="flex gap-2 px-3 pt-4 pb-2 max-w-2xl mx-auto w-full">
-          {(["class", "students"] as Tab[]).map((t) => (
+          {([["class", "📚 학급 관리"], ["homework", "📝 숙제 내기"]] as [Tab, string][]).map(([t, label]) => (
             <button
               key={t}
               onClick={() => switchTab(t)}
@@ -132,7 +146,7 @@ export default function TeacherSettings({ onBack }: Props) {
                 border: `1.5px solid ${tab === t ? "rgba(59,130,246,0.5)" : "rgba(255,255,255,0.08)"}`,
               }}
             >
-              {t === "class" ? "📚 학급 설정" : "👦 학생 목록"}
+              {label}
             </button>
           ))}
         </div>
@@ -141,16 +155,16 @@ export default function TeacherSettings({ onBack }: Props) {
       {/* 본문 */}
       <div className="flex-1 overflow-auto px-3 py-4 flex flex-col gap-5 max-w-2xl w-full mx-auto">
 
-        {/* ── 학급 설정 탭 ── */}
+        {/* ── 학급 관리 탭 ── */}
         {tab === "class" && (
           <>
-            {/* 학급 정보 요약 */}
+            {/* 학급 정보 */}
             <section>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-black text-sky-300 text-xs uppercase tracking-wider">학급 정보</h2>
                 {!isEditingClass && (
                   <button
-                    onClick={startEditing}
+                    onClick={startEditingClass}
                     className="rounded-xl px-3 py-1.5 text-xs font-bold transition-all active:scale-95"
                     style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
                   >
@@ -158,6 +172,8 @@ export default function TeacherSettings({ onBack }: Props) {
                   </button>
                 )}
               </div>
+
+              {/* 요약 카드 */}
               <div className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
                 <div className="flex items-start justify-between">
                   <div>
@@ -175,203 +191,241 @@ export default function TeacherSettings({ onBack }: Props) {
                   </div>
                 </div>
               </div>
-            </section>
 
-            {/* 편집 영역 */}
-            {isEditingClass && (
-              <>
-                {/* 학년 선택 */}
-                <section>
-                  <h2 className="font-black text-sky-300 text-xs uppercase tracking-wider mb-3">학년 선택</h2>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[1, 2, 3, 4, 5, 6].map((g) => (
-                      <button
-                        key={g}
-                        onClick={() => selectGrade(g)}
-                        className="rounded-2xl py-3 font-black text-sm transition-all active:scale-95"
-                        style={displayClass.grade === g ? SELECTED_STYLE : UNSELECTED_STYLE}
-                      >
-                        {g}학년
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                {/* 학기 선택 */}
-                <section>
-                  <h2 className="font-black text-sky-300 text-xs uppercase tracking-wider mb-3">학기 선택</h2>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[1, 2].map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => selectSemester(s)}
-                        className="rounded-2xl py-3 font-black text-sm transition-all active:scale-95"
-                        style={displayClass.semester === s ? SELECTED_STYLE : UNSELECTED_STYLE}
-                      >
-                        {s}학기
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                {/* 교과서 선택 */}
-                <section>
-                  <h2 className="font-black text-sky-300 text-xs uppercase tracking-wider mb-3">
-                    교과서 선택
-                    <span className="text-slate-400 font-normal normal-case ml-2 text-xs">
-                      {displayClass.grade}학년 {displayClass.semester}학기 · {filteredTextbooks.length}종
-                    </span>
-                  </h2>
-                  {filteredTextbooks.length === 0 ? (
-                    <div className="rounded-2xl p-6 text-center text-slate-500 text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(255,255,255,0.12)" }}>
-                      해당 학년/학기의 교과서 정보가 없습니다
-                    </div>
-                  ) : (
+              {/* 인라인 편집 영역 */}
+              {isEditingClass && (
+                <div className="mt-4 flex flex-col gap-4">
+                  {/* 학년 선택 */}
+                  <div>
+                    <div className="font-black text-sky-300 text-xs uppercase tracking-wider mb-2">학년 선택</div>
                     <div className="grid grid-cols-3 gap-2">
-                      {filteredTextbooks.map((tb) => {
-                        const selected = displayClass.textbookId === tb.id;
-                        return (
-                          <button
-                            key={tb.id}
-                            onClick={() => selectTextbook(tb.id)}
-                            className="rounded-2xl p-3 text-center transition-all active:scale-95 flex flex-col items-center justify-center gap-1"
-                            style={{
-                              background: selected ? "linear-gradient(135deg,#1d4ed8,#2563eb)" : "rgba(255,255,255,0.06)",
-                              border: `2px solid ${selected ? "#3b82f6" : "rgba(255,255,255,0.1)"}`,
-                              boxShadow: selected ? "0 4px 16px rgba(59,130,246,0.4)" : "none",
-                              minHeight: 64,
-                            }}
-                          >
-                            <div className="font-black text-white text-xs leading-tight">{tb.publisher}</div>
-                            {selected && <div className="text-blue-200 text-xs font-bold">✓</div>}
-                          </button>
-                        );
-                      })}
+                      {[1, 2, 3, 4, 5, 6].map((g) => (
+                        <button key={g} onClick={() => selectGrade(g)}
+                          className="rounded-2xl py-3 font-black text-sm transition-all active:scale-95"
+                          style={displayClass.grade === g ? SELECTED_STYLE : UNSELECTED_STYLE}>
+                          {g}학년
+                        </button>
+                      ))}
                     </div>
-                  )}
-                </section>
+                  </div>
 
-                {/* 단원 목차 */}
-                {selectedTextbook && (
-                  <section>
-                    <h2 className="font-black text-sky-300 text-xs uppercase tracking-wider mb-3">
-                      단원 목차
+                  {/* 학기 선택 */}
+                  <div>
+                    <div className="font-black text-sky-300 text-xs uppercase tracking-wider mb-2">학기 선택</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[1, 2].map((s) => (
+                        <button key={s} onClick={() => selectSemester(s)}
+                          className="rounded-2xl py-3 font-black text-sm transition-all active:scale-95"
+                          style={displayClass.semester === s ? SELECTED_STYLE : UNSELECTED_STYLE}>
+                          {s}학기
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 교과서 선택 */}
+                  <div>
+                    <div className="font-black text-sky-300 text-xs uppercase tracking-wider mb-2">
+                      교과서 선택
                       <span className="text-slate-400 font-normal normal-case ml-2 text-xs">
-                        {selectedTextbook.name}
+                        {displayClass.grade}학년 {displayClass.semester}학기 · {filteredTextbooks.length}종
                       </span>
-                    </h2>
-                    {selectedTextbook.units.length === 0 ? (
+                    </div>
+                    {filteredTextbooks.length === 0 ? (
                       <div className="rounded-2xl p-6 text-center text-slate-500 text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(255,255,255,0.12)" }}>
-                        단원 정보 준비 중...
+                        해당 학년/학기의 교과서 정보가 없습니다
                       </div>
                     ) : (
-                      <div className="flex flex-col gap-2">
-                        {selectedTextbook.units.map((unit, idx) => (
-                          <div
-                            key={unit.id}
-                            className="rounded-2xl px-4 py-3 flex items-center gap-3"
-                            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
-                          >
-                            <div
-                              className="rounded-xl flex items-center justify-center font-black text-sm flex-shrink-0"
-                              style={{ width: 34, height: 34, background: "rgba(255,255,255,0.08)", color: "#94a3b8" }}
-                            >
-                              {idx + 1}
-                            </div>
-                            <span className="flex-1 text-white font-semibold text-sm">{unit.title}</span>
-                          </div>
-                        ))}
+                      <div className="grid grid-cols-3 gap-2">
+                        {filteredTextbooks.map((tb) => {
+                          const selected = displayClass.textbookId === tb.id;
+                          return (
+                            <button key={tb.id} onClick={() => selectTextbook(tb.id)}
+                              className="rounded-2xl p-3 text-center transition-all active:scale-95 flex flex-col items-center justify-center gap-1"
+                              style={{
+                                background: selected ? "linear-gradient(135deg,#1d4ed8,#2563eb)" : "rgba(255,255,255,0.06)",
+                                border: `2px solid ${selected ? "#3b82f6" : "rgba(255,255,255,0.1)"}`,
+                                boxShadow: selected ? "0 4px 16px rgba(59,130,246,0.4)" : "none",
+                                minHeight: 64,
+                              }}>
+                              <div className="font-black text-white text-xs leading-tight">{tb.publisher}</div>
+                              {selected && <div className="text-blue-200 text-xs font-bold">✓</div>}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
-                  </section>
-                )}
+                  </div>
 
-                {/* 완료 버튼 */}
-                <button
-                  onClick={finishEditing}
-                  className="w-full rounded-2xl py-3.5 font-black text-sm transition-all active:scale-95 text-white"
-                  style={{ background: "linear-gradient(135deg,#1d4ed8,#2563eb)", boxShadow: "0 4px 16px rgba(59,130,246,0.3)" }}
-                >
-                  완료
-                </button>
-              </>
-            )}
+                  {/* 단원 목차 */}
+                  {selectedTextbook && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="font-black text-sky-300 text-xs uppercase tracking-wider">
+                          단원 목차
+                          <span className="text-slate-400 font-normal normal-case ml-2 text-xs">{selectedTextbook.name}</span>
+                        </div>
+                        <button
+                          onClick={() => setUnitsExpanded((v) => !v)}
+                          className="rounded-lg px-2.5 py-1 text-xs font-bold transition-all active:scale-95"
+                          style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.55)" }}
+                        >
+                          {unitsExpanded ? "접기 ▲" : "펼치기 ▼"}
+                        </button>
+                      </div>
+                      {unitsExpanded && (
+                        selectedTextbook.units.length === 0 ? (
+                          <div className="rounded-2xl p-6 text-center text-slate-500 text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(255,255,255,0.12)" }}>
+                            단원 정보 준비 중...
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2">
+                            {selectedTextbook.units.map((unit, idx) => (
+                              <div key={unit.id} className="rounded-2xl px-3 py-3 flex items-center gap-2"
+                                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                                <div className="rounded-lg flex items-center justify-center font-black text-xs flex-shrink-0"
+                                  style={{ width: 26, height: 26, background: "rgba(255,255,255,0.08)", color: "#94a3b8" }}>
+                                  {idx + 1}
+                                </div>
+                                <span className="flex-1 text-white font-semibold text-xs leading-tight">{unit.title}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  )}
+
+                  {/* 완료 / 취소 */}
+                  <div className="flex gap-2">
+                    <button onClick={cancelEditingClass}
+                      className="flex-1 rounded-2xl py-3.5 font-black text-sm transition-all active:scale-95"
+                      style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.6)" }}>
+                      취소
+                    </button>
+                    <button onClick={finishEditingClass}
+                      className="flex-[2] rounded-2xl py-3.5 font-black text-sm transition-all active:scale-95 text-white"
+                      style={{ background: "linear-gradient(135deg,#1d4ed8,#2563eb)", boxShadow: "0 4px 16px rgba(59,130,246,0.3)" }}>
+                      완료
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* 학생 목록 */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-black text-sky-300 text-xs uppercase tracking-wider">학생 목록</h2>
+                {!isEditingStudents ? (
+                  <button
+                    onClick={() => setIsEditingStudents(true)}
+                    className="rounded-xl px-3 py-1.5 text-xs font-bold transition-all active:scale-95"
+                    style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                  >
+                    편집
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setAddingStudent(true); setNewStudentName(""); }}
+                      className="rounded-xl px-3 py-1.5 text-xs font-bold text-white transition-all active:scale-95"
+                      style={{ background: "linear-gradient(135deg,#059669,#10b981)" }}
+                    >
+                      + 추가
+                    </button>
+                    <button
+                      onClick={stopEditingStudents}
+                      className="rounded-xl px-3 py-1.5 text-xs font-bold transition-all active:scale-95"
+                      style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                    >
+                      완료
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {addingStudent && (
+                <div className="flex gap-2 mb-3">
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="학생 이름"
+                    value={newStudentName}
+                    onChange={(e) => setNewStudentName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") addStudent();
+                      if (e.key === "Escape") { setAddingStudent(false); setNewStudentName(""); }
+                    }}
+                    className="flex-1 rounded-xl px-4 py-2 text-sm font-medium outline-none"
+                    style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "1px solid rgba(255,255,255,0.25)" }}
+                  />
+                  <button onClick={addStudent} className="rounded-xl px-3 py-2 text-sm font-bold text-white" style={{ background: "#059669" }}>추가</button>
+                  <button onClick={() => { setAddingStudent(false); setNewStudentName(""); }} className="rounded-xl px-3 py-2 text-sm font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "#94a3b8" }}>취소</button>
+                </div>
+              )}
+
+              {settings.students.length === 0 && !addingStudent ? (
+                <div className="rounded-2xl p-8 text-center text-slate-500 text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(255,255,255,0.12)" }}>
+                  학생을 추가해주세요
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {settings.students.map((student, idx) => (
+                    <div key={student.id} className="rounded-2xl px-4 py-3 flex items-center gap-3"
+                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div className="rounded-xl flex items-center justify-center font-black text-sm flex-shrink-0"
+                        style={{ width: 34, height: 34, background: "rgba(255,255,255,0.08)", color: "#94a3b8" }}>
+                        {idx + 1}
+                      </div>
+                      {editingStudent?.id === student.id ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editingStudent.name}
+                          onChange={(e) => setEditingStudent({ ...editingStudent, name: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") updateStudent(student.id, editingStudent.name);
+                            if (e.key === "Escape") setEditingStudent(null);
+                          }}
+                          className="flex-1 rounded-lg px-2 py-1 text-sm outline-none"
+                          style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "1px solid rgba(255,255,255,0.25)" }}
+                        />
+                      ) : (
+                        <span className="flex-1 text-white font-semibold text-sm">{student.name}</span>
+                      )}
+                      {isEditingStudents && (
+                        <div className="flex gap-1 flex-shrink-0">
+                          {editingStudent?.id === student.id ? (
+                            <>
+                              <button onClick={() => updateStudent(student.id, editingStudent.name)} className="rounded-lg px-2.5 py-1 text-xs font-bold text-white" style={{ background: "#059669" }}>저장</button>
+                              <button onClick={() => setEditingStudent(null)} className="rounded-lg px-2.5 py-1 text-xs font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "#94a3b8" }}>취소</button>
+                            </>
+                          ) : (
+                            <>
+                              <button onClick={() => setEditingStudent({ ...student })} className="rounded-lg px-2.5 py-1 text-xs font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "#94a3b8" }}>수정</button>
+                              <button onClick={() => deleteStudent(student.id)} className="rounded-lg px-2.5 py-1 text-xs font-bold" style={{ background: "rgba(239,68,68,0.15)", color: "#f87171" }}>삭제</button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </>
         )}
 
-        {/* ── 학생 목록 탭 ── */}
-        {tab === "students" && (
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-black text-sky-300 text-xs uppercase tracking-wider">학생 목록</h2>
-              <button
-                onClick={() => { setAddingStudent(true); setNewStudentName(""); }}
-                className="rounded-xl px-3 py-1.5 text-xs font-bold text-white transition-all active:scale-95"
-                style={{ background: "linear-gradient(135deg,#059669,#10b981)" }}
-              >
-                + 추가
-              </button>
+        {/* ── 숙제 내기 탭 ── */}
+        {tab === "homework" && (
+          <div className="flex-1 flex flex-col items-center justify-center py-24 gap-4">
+            <div style={{ fontSize: 52, opacity: 0.35 }}>📝</div>
+            <div className="font-black text-white text-lg">숙제 내기</div>
+            <div className="text-slate-500 text-sm text-center leading-relaxed">
+              준비 중입니다
             </div>
-
-            {addingStudent && (
-              <div className="flex gap-2 mb-3">
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="학생 이름"
-                  value={newStudentName}
-                  onChange={(e) => setNewStudentName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") addStudent(); if (e.key === "Escape") { setAddingStudent(false); setNewStudentName(""); } }}
-                  className="flex-1 rounded-xl px-4 py-2 text-sm font-medium outline-none"
-                  style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "1px solid rgba(255,255,255,0.25)" }}
-                />
-                <button onClick={addStudent} className="rounded-xl px-3 py-2 text-sm font-bold text-white" style={{ background: "#059669" }}>추가</button>
-                <button onClick={() => { setAddingStudent(false); setNewStudentName(""); }} className="rounded-xl px-3 py-2 text-sm font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "#94a3b8" }}>취소</button>
-              </div>
-            )}
-
-            {settings.students.length === 0 && !addingStudent ? (
-              <div className="rounded-2xl p-8 text-center text-slate-500 text-sm" style={{ background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(255,255,255,0.12)" }}>
-                학생을 추가해주세요
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {settings.students.map((student, idx) => (
-                  <div key={student.id} className="rounded-2xl px-4 py-3 flex items-center gap-3" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    <div className="rounded-xl flex items-center justify-center font-black text-sm flex-shrink-0" style={{ width: 34, height: 34, background: "rgba(255,255,255,0.08)", color: "#94a3b8" }}>
-                      {idx + 1}
-                    </div>
-                    {editingStudent?.id === student.id ? (
-                      <input
-                        autoFocus
-                        type="text"
-                        value={editingStudent.name}
-                        onChange={(e) => setEditingStudent({ ...editingStudent, name: e.target.value })}
-                        onKeyDown={(e) => { if (e.key === "Enter") updateStudent(student.id, editingStudent.name); if (e.key === "Escape") setEditingStudent(null); }}
-                        className="flex-1 rounded-lg px-2 py-1 text-sm outline-none"
-                        style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "1px solid rgba(255,255,255,0.25)" }}
-                      />
-                    ) : (
-                      <span className="flex-1 text-white font-semibold text-sm">{student.name}</span>
-                    )}
-                    <div className="flex gap-1 flex-shrink-0">
-                      {editingStudent?.id === student.id ? (
-                        <>
-                          <button onClick={() => updateStudent(student.id, editingStudent.name)} className="rounded-lg px-2.5 py-1 text-xs font-bold text-white" style={{ background: "#059669" }}>저장</button>
-                          <button onClick={() => setEditingStudent(null)} className="rounded-lg px-2.5 py-1 text-xs font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "#94a3b8" }}>취소</button>
-                        </>
-                      ) : (
-                        <>
-                          <button onClick={() => setEditingStudent({ ...student })} className="rounded-lg px-2.5 py-1 text-xs font-bold" style={{ background: "rgba(255,255,255,0.08)", color: "#94a3b8" }}>수정</button>
-                          <button onClick={() => deleteStudent(student.id)} className="rounded-lg px-2.5 py-1 text-xs font-bold" style={{ background: "rgba(239,68,68,0.15)", color: "#f87171" }}>삭제</button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          </div>
         )}
       </div>
     </div>
