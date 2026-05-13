@@ -10,7 +10,7 @@ export type CharState = "idle" | "focus" | "success" | "oops";
 const CHAR_IMGS: Record<CharState, string> = {
   idle:    "/assets/character/main.png",
   focus:   "/assets/character/focus.png",
-  success: "/assets/character/success.png",
+  success: "/assets/character/success.svg",
   oops:    "/assets/character/oops.png",
 };
 
